@@ -25,7 +25,7 @@ float B_ = 1.4f;
 float C_ = 1.0f;
 
 adc_struct aaddcc = {0};
-const uint16 MAX_ADC[NUM] = {2000, 2000, 2000, 2000, 2000};
+const uint16 MAX_ADC[NUM] = {4095, 4095, 4095, 4095, 4095};
 uint16 AD_value[NUM][10];
 uint16 ad_ave[NUM] = {0};
 float AD_ONE[NUM] = {0};
@@ -55,9 +55,10 @@ static void em_discharge_peak_cap(void)
     em_adc_pin_release();
 }
 
-static void em_set_gain_5x(void)
+static void em_set_gain_20p7x(void)
 {
-    gpio_high(EM_ROE_PIN);
+    gpio_high(EM_RMUX_PIN);
+    gpio_low(EM_ROE_PIN);
     system_delay_us(EM_SWITCH_SETTLE_US);
 }
 
@@ -132,7 +133,7 @@ void direction_adc_init(void)
     em_adc_pin_release();
     adc_init(EM_ADC_CHANNEL, ADC_12BIT);
 
-    em_set_gain_5x();
+    em_set_gain_20p7x();
     em_discharge_peak_cap();
 }
 

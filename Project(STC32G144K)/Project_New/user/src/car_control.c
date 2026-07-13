@@ -61,6 +61,8 @@ uint8 flag_suction_fan_off = 0;
 // EEPROM默认值
 static uint8 flag_suction_fan_off_iap = 0;
 
+#define error_turn 17.0f
+
 /*---------------------------------------------------------------------------
  * 正常循迹模式 (flag=0)
  *---------------------------------------------------------------------------*/
@@ -81,12 +83,12 @@ void CarControl_NormalMode(void) {
     normal_speed_pre = normal_speed;
     test_speed = (int16)normal_speed_cal;
 
-    if (flag_key_fast == 1) {
-        speed_adjust(120, 600);
-    }
-    else {
-        speed_adjust(120, 600);
-    }
+    // if (flag_key_fast == 1) {
+    //     speed_adjust(120, 600);
+    // }
+    // else {
+        speed_adjust(160, 800);  // 差速和最高速度限幅
+    // }
 }
 
 /*---------------------------------------------------------------------------
@@ -210,7 +212,7 @@ uint8 car_stop_judge(void) {
 void dir_pid(float error, float last_error, float gyro) {
     int16 p_out, d_out, output;
     
-    p_out = (int16)((kpa / 10) * error + (kpb / 10000) * error * error * error);
+    p_out = (int16)((kpa / 10) * error + kpb * (error / error_turn) * (error / error_turn) * (error / error_turn));
     d_out = (int16)(kd * (error - last_error)) + (int16)(kd_imu / 100.0 * gyro);
     output = p_out + d_out;
 
