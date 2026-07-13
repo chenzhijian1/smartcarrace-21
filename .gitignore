@@ -1,0 +1,59 @@
+# Codex and editor workspace state
+.agents/
+.codex/
+.vscode/
+.idea/
+*.code-workspace
+
+# This directory is maintained as its own Git repository.
+/Project(STC32g12k128)/
+
+# Keep only the active Project_New source tree and its shared libraries.
+/Project(STC32G144K)/*
+!/Project(STC32G144K)/Project_New/
+!/Project(STC32G144K)/libraries/
+
+# Keil MDK user and build output
+**/out_file/
+**/Out_File/
+**/Objects/
+**/Listings/
+**/RTE/
+*.uvopt
+*.uvoptx
+*.uvgui*
+*.uvguix*
+*.czj
+*.log
+*.build_log
+
+# Compiler, linker, and generated firmware output
+*.obj
+*.o
+*.crf
+*.__i
+*.lst
+*.map
+*.lnp
+*.dep
+*.d
+*.axf
+*.elf
+*.hex
+*.bin
+*.m51
+*.i51
+
+# Local temporary and backup files
+*.bak
+*.tmp
+*.swp
+*.swo
+*~
+__pycache__/
+*.py[cod]
+
+# Archives are distribution artifacts, not source.
+*.7z
+*.zip
+*.rar
