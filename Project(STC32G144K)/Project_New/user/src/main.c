@@ -1,9 +1,37 @@
 #include "headfile.h"
 
 uint8 send_flag = 1;
+uint8 uart_output_mode = 0;
 
-int8 duty = 0;
-int8 dir = 1;
+void uart_telemetry_print(void)
+{
+    switch (uart_output_mode)
+    {
+        case 0:
+            printf("%d,%d,", motor_left.setspeed, motor_left.encoder_data);
+            printf("%d,%d,", motor_right.setspeed, motor_right.encoder_data);
+            printf("%d,", normal_speed);
+            printf("%.2f,", aaddcc.err_dir);
+            printf("%d\r\n", voltage_battery_get_mv());
+            break;
+
+        case 1:
+            printf("%d,%d,", ad_ave[0], ad_ave[1]);
+            printf("%d,%d,", ad_ave[3], ad_ave[4]);
+            printf("%.2f\r\n", aaddcc.err_dir);
+            break;
+
+        case 2:
+            printf("%.2f,%.2f,", AD_ONE[0], AD_ONE[1]);
+            printf("%.2f,%.2f,", AD_ONE[3], AD_ONE[4]);
+            printf("%.2f\r\n", aaddcc.err_dir);
+            break;
+
+        default:
+            uart_output_mode = 0;
+            break;
+    }
+}
 
 void main(void)
 {
@@ -22,13 +50,11 @@ void main(void)
     // ips114_init();
     // ips114_clear(RGB565_BLACK);
 
-    if(wireless_uart_init())                                          // 判断初始化是否成功
-    {
-        while(1)                                                      // 初始化失败后进入死循环
-        {
+    if(wireless_uart_init()) {                                         // 判断初始化是否成�?
+        while(1) {                                                      // 初始化失败后进入死循�? 
             gpio_toggle_level(IO_P52);                                  // 翻转 LED 引脚输出电平 控制 LED 亮灭
-            system_delay_ms(100);                                     // 短延时快速闪灯表示异常
-        }
+            system_delay_ms(100);                                     // 短延时快速闪灯表示异�? 
+        }                                                     
     }
     
     Quaternion_Init();
@@ -77,24 +103,7 @@ void main(void)
         if (send_flag)
         {
             send_flag = 0;
-
-            // printf("%d,%d\r\n", motor_left.encoder_data, motor_right.encoder_data);
-
-            // printf("%d,%d,%d,%d,%d,%d,%.2f\r\n",
-            //        imu963ra_acc_x, imu963ra_acc_y, imu963ra_acc_z,
-            //        imu963ra_gyro_x, imu963ra_gyro_y, imu963ra_gyro_z, euler.yaw);
-
-            // printf("%.2f\r\n", euler.yaw);
-
-            printf("%d,%d,%d,%d,%d,%.2f,%d\r\n",
-                   motor_left.setspeed, motor_left.encoder_data,
-                   motor_right.setspeed, motor_right.encoder_data,
-                   normal_speed,
-                   aaddcc.err_dir,
-                   voltage_battery_get_mv());
-
-            // printf("%d,%d,%d,%d,%.2f\r\n", ad_ave[0], ad_ave[1], ad_ave[3], ad_ave[4], aaddcc.err_dir);
-
+            uart_telemetry_print();
         }
 
         // system_delay_ms(20);

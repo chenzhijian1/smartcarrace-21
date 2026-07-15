@@ -87,7 +87,7 @@ void CarControl_NormalMode(void) {
     //     speed_adjust(120, 600);
     // }
     // else {
-        speed_adjust(160, 800);  // 差速和最高速度限幅
+        speed_adjust(250, 1000);  // 差速和最高速度限幅
     // }
 }
 

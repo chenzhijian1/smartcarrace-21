@@ -3,7 +3,7 @@
 
 #include "zf_common_typedef.h"
 
-#define VOLTAGE_LOW_THRESHOLD_MV 10800UL
+#define VOLTAGE_LOW_THRESHOLD_MV 10500UL
 
 uint16 voltage_battery_get_mv(void);
 uint8 voltage_battery_is_low(void);

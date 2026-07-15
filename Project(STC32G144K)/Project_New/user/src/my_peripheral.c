@@ -24,12 +24,14 @@ static uint8 uart_cmd_index = 0;
 
 static void uart_command_print_params(void)
 {
-    printf("%.2f,%.2f,%.2f,%.2f", kpa, kpb, kd, kd_imu);
+    printf("%.2f,%.2f,", kpa, kpb);
+    printf("%.2f,%.2f,", kd, kd_imu);
     printf("%.2f,%.2f,", kp_motor, ki_motor);
     printf("%d,", normal_speed);
     printf("%.2f,%.2f,", s, distance_after_huandao);
     printf("%.2f,", g_angle_turn);
-    printf("%.2f,%.2f,%.2f\r\n", A_, B_, C_);
+    printf("%.2f,%.2f,", A_, B_);
+    printf("%.2f\r\n", C_);
 }
 
 static float uart_cmd_to_float(const char *str)
@@ -85,6 +87,17 @@ static uint8 uart_command_apply(char *cmd)
 {
     float value;
     uint8 applied = 1;
+
+    if (cmd[0] == 't' && cmd[1] == '\0')
+    {
+        uart_output_mode++;
+        if (uart_output_mode >= 3)
+        {
+            uart_output_mode = 0;
+        }
+        printf("mode,%d\r\n", uart_output_mode);
+        return 1;
+    }
 
     if (cmd[0] == '\0' || cmd[1] == '\0')
     {
@@ -156,7 +169,13 @@ void uart_command_poll(void)
 
     for (i = 0; i < len; i++)
     {
-        if (uart_cmd_rx_data[i] == '\r' || uart_cmd_rx_data[i] == '\n')
+        if (uart_cmd_index == 0 && uart_cmd_rx_data[i] == 't')
+        {
+            uart_cmd_buf[0] = 't';
+            uart_cmd_buf[1] = '\0';
+            uart_command_apply((char *)uart_cmd_buf);
+        }
+        else if (uart_cmd_rx_data[i] == '\r' || uart_cmd_rx_data[i] == '\n')
         {
             uart_cmd_buf[uart_cmd_index] = '\0';
             uart_command_apply((char *)uart_cmd_buf);

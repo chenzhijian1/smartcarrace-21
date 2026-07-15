@@ -51,6 +51,7 @@ extern uint8 count_flag_4;      // TOF判断次数
 
 extern volatile uint8 flag_gyro_z;
 extern volatile uint8 gyro_update_ticks;       // 陀螺仪数据就绪标志
+extern uint8 uart_output_mode;
 
 /*---------------------------------------------------------------------------
  * 函数声明
@@ -58,6 +59,7 @@ extern volatile uint8 gyro_update_ticks;       // 陀螺仪数据就绪标志
 // 陀螺仪相关（使用四元数解算�?
 void pit_callback(void);        // 定时器中断回�?IMU数据更新)
 void uart_command_poll(void);   // wireless uart parameter command poll
+void uart_telemetry_print(void);
 
 // 蜂鸣器相�?
 void beep_init(void);           // 蜂鸣器初始化
