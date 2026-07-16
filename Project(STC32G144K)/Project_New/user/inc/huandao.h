@@ -21,12 +21,16 @@
  *---------------------------------------------------------------------------*/
 #define CAR_WIDTH 16.0f  // 车宽(cm)
 
+#define HUANDAO_DIR_SOURCE_ROUTE  (0)
+#define HUANDAO_DIR_SOURCE_SENSOR (1)
+
 /*---------------------------------------------------------------------------
  * 环岛参数配置
  *---------------------------------------------------------------------------*/
 extern uint8 huandao_num;                   // 环岛个数
 extern uint8 huandao_count;                 // 环岛计数
 extern uint8 huandao_dir[6];                // 环岛方向 (0:左, 1:右)
+extern uint8 huandao_dir_source[6];         // 方向来源 (0:预设, 1:横电感)
 extern uint8 huandao_r[6];                  // 环岛半径
 extern float distance_before_huandao[6];    // 环岛前距离
 extern float distance_after_huandao;        // 环岛后距离

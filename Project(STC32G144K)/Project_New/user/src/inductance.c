@@ -1,4 +1,5 @@
 #include "inductance.h"
+#include "element.h"
 #include "zf_driver_adc.h"
 
 #define EM_ADC_CHANNEL ADC1_CH0_P10
@@ -184,16 +185,14 @@ void direction_adc_get(void)
         AD_ONE[i] = 100 * (float)ad_ave[i] / MAX_ADC[i];
     }
 
-#if 0
-    /* Circle detection: flag 0 -> flag 1. Temporarily disabled. */
-    if (flag == 0 && ((AD_ONE[0] + AD_ONE[4]) >= 30.0f))
-    {
-        encoder_temp = encoder_ave;
-        flag = 1;
-    }
-#endif
-
     aaddcc.last_err_dir = aaddcc.err_dir;
+
+    if (element_process())
+    {
+        aaddcc.err_dir = 0.0f;
+        aaddcc.last_err_dir = 0.0f;
+        return;
+    }
 
     if (AD_ONE[0] + AD_ONE[1] + AD_ONE[3] + AD_ONE[4] < 4)
     {

@@ -10,7 +10,7 @@ void uart_telemetry_print(void)
         case 0:
             printf("%d,%d,", motor_left.setspeed, motor_left.encoder_data);
             printf("%d,%d,", motor_right.setspeed, motor_right.encoder_data);
-            printf("%d,", normal_speed);
+            printf("%d,%.1f,", normal_speed, encoder_ave);
             printf("%.2f,", aaddcc.err_dir);
             printf("%d\r\n", voltage_battery_get_mv());
             break;
@@ -18,13 +18,15 @@ void uart_telemetry_print(void)
         case 1:
             printf("%d,%d,", ad_ave[0], ad_ave[1]);
             printf("%d,%d,", ad_ave[3], ad_ave[4]);
-            printf("%.2f\r\n", aaddcc.err_dir);
+            printf("%.2f,", aaddcc.err_dir);
+            printf("%.1f\r\n", encoder_ave);
             break;
 
         case 2:
             printf("%.2f,%.2f,", AD_ONE[0], AD_ONE[1]);
             printf("%.2f,%.2f,", AD_ONE[3], AD_ONE[4]);
-            printf("%.2f\r\n", aaddcc.err_dir);
+            printf("%.2f,", aaddcc.err_dir);
+            printf("%.1f\r\n", encoder_ave);
             break;
 
         default:
@@ -50,10 +52,10 @@ void main(void)
     // ips114_init();
     // ips114_clear(RGB565_BLACK);
 
-    if(wireless_uart_init()) {                                         // 判断初始化是否成�?
-        while(1) {                                                      // 初始化失败后进入死循�? 
+    if(wireless_uart_init()) {                                         // 判断初始化是否成�?
+        while(1) {                                                      // 初始化失败后进入死循�? 
             gpio_toggle_level(IO_P52);                                  // 翻转 LED 引脚输出电平 控制 LED 亮灭
-            system_delay_ms(100);                                     // 短延时快速闪灯表示异�? 
+            system_delay_ms(100);                                     // 短延时快速闪灯表示异�? 
         }                                                     
     }
     

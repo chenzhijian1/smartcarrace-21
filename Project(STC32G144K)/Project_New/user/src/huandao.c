@@ -3,6 +3,7 @@
 #include "car_control.h"
 #include "my_motor.h"
 #include "inductance.h"
+#include "element.h"
 #include "quaternion.h"
 #include "navigation.h"
 
@@ -17,6 +18,7 @@
 uint8 huandao_num = 2;
 uint8 huandao_count = 0;
 uint8 huandao_dir[6] = {1, 0, 0, 0, 0, 0};
+uint8 huandao_dir_source[6] = {0, 0, 0, 0, 0, 0};
 uint8 huandao_r[6] = {30, 35, 30, 30, 30, 30};
 float distance_before_huandao[6] = {210, 260, 210, 210, 210, 210};
 float distance_after_huandao = 0;
@@ -54,8 +56,6 @@ float target_angle_out = 0;         // 出环目标角度
  * 功能：直行到环岛入口
  *---------------------------------------------------------------------------*/
 void Huandao_PreCircle(void) {
-    flag_huandao = huandao_dir[huandao_count];
-    
     if (encoder_ave - encoder_temp < distance_before_huandao[huandao_count]) {
         // 还没到环岛交点，直行
         set_leftspeed = normal_speed;
@@ -162,6 +162,7 @@ void Huandao_ExitStraight(void) {
     else {
         // 恢复到正常循迹
         flag = 0;
+        element_handler_start_rearm();
         Huandao_Reset();
         huandao_count = (huandao_count + 1) % huandao_num;
     }

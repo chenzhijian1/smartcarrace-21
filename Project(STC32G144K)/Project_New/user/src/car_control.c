@@ -3,6 +3,7 @@
 #include "huandao.h"
 #include "my_motor.h"
 #include "inductance.h"
+#include "element.h"
 #include "navigation.h"
 #include "quaternion.h"
 #include "zf_device_imu963ra.h"
@@ -67,6 +68,16 @@ static uint8 flag_suction_fan_off_iap = 0;
  * 正常循迹模式 (flag=0)
  *---------------------------------------------------------------------------*/
 void CarControl_NormalMode(void) {
+    if (element_handler_is_straight()) {
+        changed_speed = 0;
+        normal_speed_cal = normal_speed;
+        normal_speed_pre = normal_speed;
+        test_speed = normal_speed;
+        set_leftspeed = normal_speed;
+        set_rightspeed = normal_speed;
+        return;
+    }
+
     dir_pid(aaddcc.err_dir, aaddcc.last_err_dir, gyro_z);
 
     // 速度策略
@@ -157,8 +168,6 @@ void CarControl_Update(void) {
                 CarControl_NormalMode();
                 break;
             
-#if 0
-            /* Circle state dispatch. Temporarily disabled. */
             case 1:
                 Huandao_PreCircle();
                 break;
@@ -174,7 +183,6 @@ void CarControl_Update(void) {
             case 7:
                 Huandao_ExitStraight();
                 break;
-#endif
 
             case 4:  // 起步发车
                 CarControl_LaunchMode();

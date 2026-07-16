@@ -868,11 +868,6 @@
               <FilePath>..\user\inc\my_peripheral.h</FilePath>
             </File>
             <File>
-              <FileName>navigation.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>..\user\inc\navigation.h</FilePath>
-            </File>
-            <File>
               <FileName>quaternion.h</FileName>
               <FileType>5</FileType>
               <FilePath>..\user\inc\quaternion.h</FilePath>
@@ -891,6 +886,16 @@
               <FileName>voltage.h</FileName>
               <FileType>5</FileType>
               <FilePath>..\user\inc\voltage.h</FilePath>
+            </File>
+            <File>
+              <FileName>element.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\user\inc\element.h</FilePath>
+            </File>
+            <File>
+              <FileName>navigation.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\user\inc\navigation.h</FilePath>
             </File>
           </Files>
         </Group>
@@ -943,11 +948,6 @@
               <FilePath>..\user\src\my_peripheral.c</FilePath>
             </File>
             <File>
-              <FileName>navigation.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\user\src\navigation.c</FilePath>
-            </File>
-            <File>
               <FileName>quaternion.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\user\src\quaternion.c</FilePath>
@@ -961,6 +961,16 @@
               <FileName>voltage.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\user\src\voltage.c</FilePath>
+            </File>
+            <File>
+              <FileName>element.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\user\src\element.c</FilePath>
+            </File>
+            <File>
+              <FileName>navigation.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\user\src\navigation.c</FilePath>
             </File>
           </Files>
         </Group>
