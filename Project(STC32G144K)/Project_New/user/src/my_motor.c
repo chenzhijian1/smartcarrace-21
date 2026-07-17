@@ -296,49 +296,20 @@ void suction_fan_init(void)
     drv8701e_wake(SUCTION_FAN_NSLEEP_PIN);
 
     gpio_init(SUCTION_FAN_DIR_PIN, GPO, GPIO_LOW, GPO_PUSH_PULL);
-    pwm_init(SUCTION_FAN_PWM, SUCTION_FAN_PWM_FREQ, 0);
+    pwm_init(SUCTION_FAN_PWM, SUCTION_FAN_PWM_FREQ, MOTOR_PWM_MAX);
     SUCTION_FAN_DIR = 0;
-}
-
-void suction_fan_set_direction(motor_dir_e dir)
-{
-    if (dir == MOTOR_FORWARD)
-    {
-        SUCTION_FAN_DIR = 1;
-    }
-    else
-    {
-        SUCTION_FAN_DIR = 0;
-    }
-}
-
-void suction_fan_brake(void)
-{
-    pwm_set_duty(SUCTION_FAN_PWM, 0);
-}
-
-void suction_fan_set_pwm(int pwm)
-{
-    pwm_set_duty(SUCTION_FAN_PWM, motor_pwm_abs(pwm));
-}
-
-void suction_fan_control(int pwm)
-{
-    pwm = motor_pwm_limit(pwm);
-
-    suction_fan_set_direction(MOTOR_FORWARD);
-
-    pwm_set_duty(SUCTION_FAN_PWM, motor_pwm_abs(pwm));
 }
 
 void suction_fan_on(int pwm)
 {
-    suction_fan_control(pwm);
+    pwm = motor_pwm_limit(pwm);
+    SUCTION_FAN_DIR = 1;
+    pwm_set_duty(SUCTION_FAN_PWM, MOTOR_PWM_MAX - motor_pwm_abs(pwm));
 }
 
 void suction_fan_off(void)
 {
     pwm_fan = 0;
     SUCTION_FAN_DIR = 1;
-    suction_fan_brake();
+    pwm_set_duty(SUCTION_FAN_PWM, MOTOR_PWM_MAX);
 }

@@ -99,10 +99,6 @@ void motor_control(int16 speed_l, int16 speed_r);
 void motor_control_stop(void);
 
 void suction_fan_init(void);
-void suction_fan_set_direction(motor_dir_e dir);
-void suction_fan_brake(void);
-void suction_fan_set_pwm(int pwm);
-void suction_fan_control(int pwm);
 void suction_fan_on(int pwm);
 void suction_fan_off(void);
 

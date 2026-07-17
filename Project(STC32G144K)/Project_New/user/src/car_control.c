@@ -20,7 +20,6 @@ uint8 flag = 0;
 uint8 flag_stop = 0;
 uint8 flag_key_control = 0;
 uint8 flag_key_fast = 0;
-uint8 flag_start = 0;
 uint8 nav_end_flag_sent = 0;
 
 /*---------------------------------------------------------------------------
@@ -49,7 +48,6 @@ float gyro_z = 0;
 float last_gyro_z = 0;
 float lpf_gyro = 0.2;
 
-uint8 cnt_start = 0;
 uint8 cnt_stop = 0;
 uint8 cnt_launch = 0;
 static volatile int16 soft_stop_start_speed = 0;
@@ -67,7 +65,7 @@ static uint8 flag_suction_fan_off_iap = 0;
 /*---------------------------------------------------------------------------
  * 正常循迹模式 (flag=0)
  *---------------------------------------------------------------------------*/
-void CarControl_NormalMode(void) {
+void CarControl_NormalMode(int16 c_speed, int16 s_speed) {
     if (element_handler_is_straight()) {
         changed_speed = 0;
         normal_speed_cal = normal_speed;
@@ -81,15 +79,7 @@ void CarControl_NormalMode(void) {
     dir_pid(aaddcc.err_dir, aaddcc.last_err_dir, gyro_z);
 
     // 速度策略
-    if (flag_start && cnt_start < 100) {
-        cnt_start++;
-        normal_speed_cal = (int16)((float)normal_speed * cnt_start / 100.0f);
-    }
-    else {
-        flag_start = 0;
-        cnt_start = 0;
-        normal_speed_cal = (int16)-s * aaddcc.err_dir * aaddcc.err_dir + normal_speed;
-    }
+    normal_speed_cal = (int16)-s * aaddcc.err_dir * aaddcc.err_dir + normal_speed;
 
     normal_speed_pre = normal_speed;
     test_speed = (int16)normal_speed_cal;
@@ -98,7 +88,7 @@ void CarControl_NormalMode(void) {
     //     speed_adjust(120, 600);
     // }
     // else {
-        speed_adjust(250, 1000);  // 差速和最高速度限幅
+        speed_adjust(c_speed, s_speed);
     // }
 }
 
@@ -116,7 +106,6 @@ void CarControl_LaunchMode(void) {
     
     // 直接切换到正常循迹模式
     flag = 0;
-    flag_start = 1;
     cnt_launch = 0;
 }
 
@@ -161,11 +150,11 @@ void CarControl_Update(void) {
         // IMU963RA陀螺仪±2000dps量程，灵敏度70 mdps/LSB = 0.07 dps/LSB
         if (imu963ra_gyro_z <= 4 && imu963ra_gyro_z >= -4)
             imu963ra_gyro_z = 0;
-        gyro_z = (float)(imu963ra_gyro_z - gyro_offset_z) * 0.07f;
+        gyro_z = (float)(imu963ra_gyro_z - gyro_offset_z) / imu963ra_transition_factor[1];
 
         switch (flag) {
             case 0:  // 正常模式
-                CarControl_NormalMode();
+                CarControl_NormalMode(250, 1000);
                 break;
             
             case 1:

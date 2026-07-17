@@ -31,7 +31,6 @@ extern uint8 flag;              // 车辆状态
 extern uint8 flag_stop;         // 停止标志
 extern uint8 flag_key_control;  // 控制模式: 0调参 1跑车
 extern uint8 flag_key_fast;     // 快速模式标志
-extern uint8 flag_start;        // 软启动标志
 extern uint8 nav_end_flag_sent; // 导航结束标志
 
 /*---------------------------------------------------------------------------
@@ -60,7 +59,6 @@ extern float gyro_z;            // 滤波后的角速度
 extern float last_gyro_z;       // 上次角速度
 extern float lpf_gyro;          // 陀螺仪低通滤波系数
 
-extern uint8 cnt_start;         // 软启动计数器
 extern uint8 cnt_stop;          // 软停车计数器
 extern uint8 cnt_launch;        // 发车计数器
 
@@ -80,7 +78,7 @@ void CarControl_SaveConfig(void);   // 保存车辆控制参数
 void CarControl_Update(void);       // 车辆状态更新(原speed_change)
 
 // 模式处理函数
-void CarControl_NormalMode(void);   // 正常循迹模式(flag=0)
+void CarControl_NormalMode(int16 c_speed, int16 s_speed);
 void CarControl_LaunchMode(void);   // 起步发车模式(flag=4)
 void CarControl_StopMode(void);     // 慢速停车模式(flag=5)
 
