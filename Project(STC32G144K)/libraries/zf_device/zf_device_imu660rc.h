@@ -69,12 +69,12 @@
 #if (IMU660RC_USE_INTERFACE==HARDWARE_SPI)
 //====================================================硬件 SPI 驱动====================================================
 	#define IMU660RC_SPI_SPEED          ((uint32)10 * 1000 * 1000U)  		// 硬件 SPI 速率
-	#define IMU660RC_SPI                ( SPI_3             )               // 硬件 SPI 号
-	#define IMU660RC_SPC_PIN            ( SPI3_CH3_SCLK_P87 )             	// 硬件 SPI SCK 引脚
-	#define IMU660RC_SDI_PIN            ( SPI3_CH3_MOSI_P85 )             	// 硬件 SPI MOSI 引脚
-	#define IMU660RC_SDO_PIN            ( SPI3_CH3_MISO_P86 )              	// 硬件 SPI MISO 引脚
-	#define IMU660RC_CS_PIN             ( IO_P34  )                       	// CS 片选引脚
-	#define IMU660RC_CS(x)              ( P34 = x )
+	#define IMU660RC_SPI                ( SPI_2             )               // 硬件 SPI 号
+	#define IMU660RC_SPC_PIN            ( SPI2_CH1_SCLK_P67 )             	// 硬件 SPI SCK 引脚
+	#define IMU660RC_SDI_PIN            ( SPI2_CH1_MOSI_P65 )             	// 硬件 SPI MOSI 引脚
+	#define IMU660RC_SDO_PIN            ( SPI2_CH1_MISO_P66 )              	// 硬件 SPI MISO 引脚
+	#define IMU660RC_CS_PIN             ( IO_P64  )                       	// CS 片选引脚
+	#define IMU660RC_CS(x)              ( P64 = x )
 //====================================================硬件 SPI 驱动====================================================
 #elif (IMU660RC_USE_INTERFACE==SOFT_SPI)
 //====================================================软件 SPI 驱动====================================================

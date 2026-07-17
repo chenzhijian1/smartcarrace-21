@@ -8,6 +8,7 @@ void uart_telemetry_print(void)
     switch (uart_output_mode)
     {
         case 0:
+            printf("%d,", flag);
             printf("%d,%d,", motor_left.setspeed, motor_left.encoder_data);
             printf("%d,%d,", motor_right.setspeed, motor_right.encoder_data);
             printf("%d,%.1f,", normal_speed, encoder_ave);
@@ -16,6 +17,7 @@ void uart_telemetry_print(void)
             break;
 
         case 1:
+            printf("%d,", flag);
             printf("%d,%d,", ad_ave[0], ad_ave[1]);
             printf("%d,%d,", ad_ave[3], ad_ave[4]);
             printf("%.2f,", aaddcc.err_dir);
@@ -23,12 +25,20 @@ void uart_telemetry_print(void)
             break;
 
         case 2:
+            printf("%d,", flag);
             printf("%.2f,%.2f,", AD_ONE[0], AD_ONE[1]);
             printf("%.2f,%.2f,", AD_ONE[3], AD_ONE[4]);
             printf("%.2f,", aaddcc.err_dir);
-            printf("%.1f\r\n", encoder_ave);
+            printf("%.1f,", encoder_ave);
+            printf("%.2f\r\n",euler.yaw);
             break;
 
+        case 3:
+            printf("%d,%d,%d,", imu660rc_gyro_x, imu660rc_gyro_y, imu660rc_gyro_z);
+            printf("%d,%d,%d,", imu660rc_acc_x, imu660rc_acc_y, imu660rc_acc_z);
+            printf("%.4f,%.4f,", q.q1, q.q2);
+            printf("%.2f,%.2f,%.2f\r\n", euler.roll, euler.pitch, euler.yaw);
+            break;
         default:
             uart_output_mode = 0;
             break;
@@ -53,16 +63,16 @@ void main(void)
     // ips114_clear(RGB565_BLACK);
 
     if(wireless_uart_init()) {                                         // 判断初始化是否成�?
-        while(1) {                                                      // 初始化失败后进入死循�? 
+        while(1) {                                                      // 初始化失败后进入死循�?
             gpio_toggle_level(IO_P52);                                  // 翻转 LED 引脚输出电平 控制 LED 亮灭
-            system_delay_ms(100);                                     // 短延时快速闪灯表示异�? 
-        }                                                     
+            system_delay_ms(100);                                     // 短延时快速闪灯表示异�?
+        }
     }
-    
+
     Quaternion_Init();
-    while (imu963ra_init())
+    while (imu660rc_init(IMU660RC_QUARTERNION_DISABLE))
     {
-        printf("\r\nIMU963RA init error.");
+        printf("\r\nIMU660RC init error.");
         system_delay_ms(300);
     }
     Gyro_Calibration(200);
@@ -74,7 +84,7 @@ void main(void)
     // motor_left_control(2000);
     // motor_right_control(2000);
 
-    // suction_fan_control(6000);
+    suction_fan_on(5000);
 
     normal_speed = 0;
 
@@ -89,8 +99,19 @@ void main(void)
 
         if (flag_gyro_z)
         {
+            uint8 ticks;
+
+            EA = 0;
+            ticks = gyro_update_ticks;
+            gyro_update_ticks = 0;
             flag_gyro_z = 0;
-            IMU_Update();
+            EA = 1;
+
+            if (ticks == 0)
+            {
+                ticks = 1;
+            }
+            IMU_Update_Dt(0.005f * ticks);
         }
 
         if (flag_adc)

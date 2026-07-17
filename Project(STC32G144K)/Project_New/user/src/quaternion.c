@@ -1,6 +1,6 @@
 #include "quaternion.h"
 #include "math.h"
-#include "zf_device_imu963ra.h"
+#include "zf_device_imu660rc.h"
 
 /*============================================================================
  * 模块说明：四元数姿态解算模�?
@@ -85,10 +85,10 @@ void Gyro_Calibration(uint16 samples) {
     float sum_x = 0, sum_y = 0, sum_z = 0;
     
     for (i = 0; i < samples; i++) {
-        imu963ra_get_gyro();
-        sum_x += imu963ra_gyro_x;
-        sum_y += imu963ra_gyro_y;
-        sum_z += imu963ra_gyro_z;
+        imu660rc_get_gyro();
+        sum_x += imu660rc_gyro_x;
+        sum_y += imu660rc_gyro_y;
+        sum_z += imu660rc_gyro_z;
         system_delay_ms(5);
     }
     
@@ -221,19 +221,19 @@ void IMU_Update_Dt(float dt) {
     float gx, gy, gz;
     float ax, ay, az;
 
-    imu963ra_get_acc();
-    imu963ra_get_gyro();
+    imu660rc_get_acc();
+    imu660rc_get_gyro();
 
-    // Sensor axes: X right, Y forward, Z up.
-    // Quaternion axes: X forward (roll), Y left (pitch), Z up (yaw).
-    gx = (float)(imu963ra_gyro_y - gyro_offset_y) / imu963ra_transition_factor[1];
-    gy = -(float)(imu963ra_gyro_x - gyro_offset_x) / imu963ra_transition_factor[1];
-    gz = (float)(imu963ra_gyro_z - gyro_offset_z) / imu963ra_transition_factor[1];
+    // Sensor axes on the car: +X left, +Y rear, +Z up.
+    // Quaternion body axes: +X forward, +Y left, +Z up.
+    gx = -(float)(imu660rc_gyro_y - gyro_offset_y) / imu660rc_transition_factor[1];
+    gy = (float)(imu660rc_gyro_x - gyro_offset_x) / imu660rc_transition_factor[1];
+    gz = (float)(imu660rc_gyro_z - gyro_offset_z) / imu660rc_transition_factor[1];
 
-    // The sensor reports about -1 g on Z at rest; Mahony expects +Z gravity.
-    ax = -imu963ra_acc_transition(imu963ra_acc_y);
-    ay = imu963ra_acc_transition(imu963ra_acc_x);
-    az = -imu963ra_acc_transition(imu963ra_acc_z);
+    // The IMU660RC reports about +1 g on Z when the car is level.
+    ax = -imu660rc_acc_transition(imu660rc_acc_y);
+    ay = imu660rc_acc_transition(imu660rc_acc_x);
+    az = imu660rc_acc_transition(imu660rc_acc_z);
 
     if (gx > -0.28f && gx < 0.28f) gx = 0.0f;
     if (gy > -0.28f && gy < 0.28f) gy = 0.0f;
