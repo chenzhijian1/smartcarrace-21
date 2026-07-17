@@ -11,6 +11,7 @@
  * 陀螺仪相关变量
  *---------------------------------------------------------------------------*/
 volatile uint8 flag_gyro_z = 0;
+volatile uint8 gyro_update_ticks = 0;
 
 /*---------------------------------------------------------------------------
  * TOF传感器变�?
@@ -28,8 +29,7 @@ static void uart_command_print_params(void)
     printf("%.2f,%.2f,", kd, kd_imu);
     printf("%.2f,%.2f,", kp_motor, ki_motor);
     printf("%d,", normal_speed);
-    printf("%.2f,%.2f,", s, distance_after_huandao);
-    printf("%.2f,", g_angle_turn);
+    printf("%.2f,", s);
     printf("%.2f,%.2f,", A_, B_);
     printf("%.2f\r\n", C_);
 }
@@ -91,7 +91,7 @@ static uint8 uart_command_apply(char *cmd)
     if (cmd[0] == 't' && cmd[1] == '\0')
     {
         uart_output_mode++;
-        if (uart_output_mode >= 3)
+        if (uart_output_mode >= 4)
         {
             uart_output_mode = 0;
         }
@@ -132,8 +132,6 @@ static uint8 uart_command_apply(char *cmd)
                 normal_speed = (int16)value;
             break;
         case 's': s = value; break;
-        case 'y': distance_after_huandao = value; break;
-        case 'z': g_angle_turn = value; break;
         case 'A': A_ = value; break;
         case 'B': B_ = value; break;
         case 'C': C_ = value; break;
@@ -154,6 +152,10 @@ static uint8 uart_command_apply(char *cmd)
  *---------------------------------------------------------------------------*/
 void pit_callback(void) {
     flag_gyro_z = 1;
+    if (gyro_update_ticks < 200)
+    {
+        gyro_update_ticks++;
+    }
 }
 
 void uart_command_poll(void)
