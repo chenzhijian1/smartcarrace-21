@@ -1,5 +1,5 @@
 /*********************************************************************************************************************
-* STC32G144K Opensourec Library 即（STC32G144K 开源库）是一个基于官方 SDK 接口的第三方开源库
+* STC32G144K Opensource Library 即（STC32G144K 开源库）是一个基于官方 SDK 接口的第三方开源库
 * Copyright (c) 2025 SEEKFREE 逐飞科技
 *
 * 本文件是STC32G144K开源库的一部分
@@ -16,8 +16,8 @@
 * 如果没有，请参阅<https://www.gnu.org/licenses/>
 *
 * 额外注明：
-* 本开源库使用 GPL3.0 开源许可证协议 以上许可申明为译文版本
-* 许可申明英文版在 libraries/doc 文件夹下的 GPL3_permission_statement.txt 文件中
+* 本开源库使用 GPL3.0 开源许可证协议 以上许可声明为译文版本
+* 许可声明英文版在 libraries/doc 文件夹下的 GPL3_permission_statement.txt 文件中
 * 许可证副本在 libraries 文件夹下 即该文件夹下的 LICENSE 文件
 * 欢迎各位使用并传播本程序 但修改内容时必须保留逐飞科技的版权声明（即本声明）
 *
@@ -176,14 +176,7 @@ extern uint8 test_count ;
             usb_cdc_write_byte(c);
             return c;
         #else
-            if(DEBUG_UART_INDEX == WIRELESS_UART_INDEX)
-            {
-                uart_write_byte(DEBUG_UART_INDEX, c); // printf direct UART3 test, bypass RTS wait
-            }
-            else
-            {
-                uart_write_byte(DEBUG_UART_INDEX, c);//把自己实现的串口打印一字节数据的函数替换到这里
-            }
+            uart_write_byte(DEBUG_UART_INDEX, c);//把自己实现的串口打印一字节数据的函数替换到这里
             return c;
         #endif
 

@@ -13,7 +13,7 @@
 #include "stc.h"
 #include "usb_desc.h"
 
-char code DEVICEDESC[18] =
+unsigned char code DEVICEDESC[18] =
 {
     0x12,                   //bLength(18);
     0x01,                   //bDescriptorType(Device);
@@ -31,7 +31,7 @@ char code DEVICEDESC[18] =
     0x01,                   //bNumConfigurations(1);
 };
 
-char code CONFIGDESC[67] =
+unsigned char code CONFIGDESC[67] =
 {
     0x09,                   //bLength(9);
     0x02,                   //bDescriptorType(Configuration);
@@ -106,13 +106,13 @@ char code CONFIGDESC[67] =
     0x00,                   //bInterval(Ignored);
 };
 
-char code LANGIDDESC[4] =
+unsigned  char code LANGIDDESC[4] =
 {
     0x04,0x03,
     0x09,0x04,
 };
 
-char code MANUFACTDESC[8] =
+unsigned  char code MANUFACTDESC[8] =
 {
     0x08,0x03,
     'S',0,
@@ -120,7 +120,7 @@ char code MANUFACTDESC[8] =
     'C',0,
 };
 
-char code PRODUCTDESC[30] =
+unsigned  char code PRODUCTDESC[30] =
 {
     0x1e,0x03,
     'S',0,
@@ -139,12 +139,12 @@ char code PRODUCTDESC[30] =
     'l',0,
 };
 
-char code PACKET0[2] = 
+unsigned  char code PACKET0[2] = 
 {
     0, 0,
 };
 
-char code PACKET1[2] = 
+unsigned  char code PACKET1[2] = 
 {
     1, 0,
 };

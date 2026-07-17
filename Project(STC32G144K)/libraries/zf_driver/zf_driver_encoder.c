@@ -1,10 +1,10 @@
 /*********************************************************************************************************************
-* STC32G Opensourec Library 即（STC32G 开源库）是一个基于官方 SDK 接口的第三方开源库
+* STC32G144K Opensource Library 即（STC32G144K 开源库）是一个基于官方 SDK 接口的第三方开源库
 * Copyright (c) 2025 SEEKFREE 逐飞科技
 *
 * 本文件是STC32G144K开源库的一部分
 *
-* STC32G 开源库 是免费软件
+* STC32G144K 开源库 是免费软件
 * 您可以根据自由软件基金会发布的 GPL（GNU General Public License，即 GNU通用公共许可证）的条款
 * 即 GPL 的第3版（即 GPL3.0）或（您选择的）任何后来的版本，重新发布和/或修改它
 *
@@ -16,8 +16,8 @@
 * 如果没有，请参阅<https://www.gnu.org/licenses/>
 *
 * 额外注明：
-* 本开源库使用 GPL3.0 开源许可证协议 以上许可申明为译文版本
-* 许可申明英文版在 libraries/doc 文件夹下的 GPL3_permission_statement.txt 文件中
+* 本开源库使用 GPL3.0 开源许可证协议 以上许可声明为译文版本
+* 许可声明英文版在 libraries/doc 文件夹下的 GPL3_permission_statement.txt 文件中
 * 许可证副本在 libraries 文件夹下 即该文件夹下的 LICENSE 文件
 * 欢迎各位使用并传播本程序 但修改内容时必须保留逐飞科技的版权声明（即本声明）
 *
@@ -295,8 +295,8 @@ void encoder_quad_init(encoder_index_enum encoder_n, encoder_channel_enum ch1_pi
 // 备注信息   
 // 使用示例     encoder_init_dir(PWMA_ENCODER, PWMA_ENCODER_CH1P_P60, PWMA_ENCODER_CH2P_P62)
 //             // 使用PWMA 做正交解码使用， 通道1方向信号引脚P60，通道2脉冲信号引脚P62
-//             encoder_init_dir(TIM17_ENCODER, IO_P45, TIM17_ENCODER_CH1_P80)
-//             // 使用TIM17_ENCODER 做正交解码使用， 通道1方向信号引脚P45，通道2脉冲信号引脚P80
+//             encoder_init_dir(TIM17_ENCODER, TIM17_ENCODER_CH1_P80, IO_P45)
+//             // 使用TIM17_ENCODER 读取编码器读取 ，脉冲信号引脚P80 ，方向信号引脚P45
 //-------------------------------------------------------------------------------------------------------------------
 void encoder_dir_init(uint16 encoder_n, uint16 lsb_pin, uint16 dir_pin)
 {
