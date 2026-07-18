@@ -68,7 +68,13 @@ void TM4_IRQHandler(void) interrupt TMR4_VECTOR
 {
     TIM4_CLEAR_FLAG;
 
-    if (++cnt_send >= 5)
+    if (uart_feedback_hold_ticks > 0)
+    {
+        uart_feedback_hold_ticks--;
+        cnt_send = 0;
+        send_flag = 0;
+    }
+    else if (++cnt_send >= 5)
     {
         cnt_send = 0;
         send_flag = 1;

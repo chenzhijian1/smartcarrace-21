@@ -10,6 +10,7 @@
 #define HUANDAO_ENTER_ANGLE 30.0f
 #define HUANDAO_INSIDE_ANGLE 300.0f
 #define HUANDAO_EXIT_DISTANCE 250.0f
+#define HUANDAO_DEBUG_STOP_ON_FLAG2 0
 
 /*============================================================================
  * 模块说明：环岛控制模块
@@ -21,11 +22,11 @@
  *---------------------------------------------------------------------------*/
 uint8 huandao_num = 1; // 环岛数量
 uint8 huandao_count = 0;
-uint8 huandao_dir[HUANDAO_MAX_COUNT] = {0, 0, 0, 0, 0};
+uint8 huandao_dir[HUANDAO_MAX_COUNT] = {1, 0, 0, 0, 0};
 // 环岛方向数组：0 为左环（逆时针、航向角增加），1 为右环（顺时针、航向角减少）。
 uint8 huandao_dir_source[HUANDAO_MAX_COUNT] = {0, 0, 0, 0, 0};
-uint8 huandao_r[HUANDAO_MAX_COUNT] = {20, 35, 30, 30, 30};
-float distance_before_huandao[HUANDAO_MAX_COUNT] = {200, 200, 200, 200, 200};
+uint8 huandao_r[HUANDAO_MAX_COUNT] = {20, 35, 30, 30, 30};   // 环岛半径数组（单位：cm）
+float distance_before_huandao[HUANDAO_MAX_COUNT] = {200, 200, 200, 200, 200};  // 环岛前距离数组（单位：编码器）
 
 // EEPROM默认值
 static float distance_before_huandao_iap[HUANDAO_MAX_COUNT] = {200, 200, 200, 200, 200};
@@ -55,6 +56,11 @@ void Huandao_PreCircle(void) {
     else {
         huandao_angle_set = 0;
         flag = 2;
+#if HUANDAO_DEBUG_STOP_ON_FLAG2
+        set_leftspeed = 0;
+        set_rightspeed = 0;
+        flag_stop = 1;
+#endif
     }
 }
 
@@ -72,8 +78,8 @@ void Huandao_EnterCircle(void) {
                           (float)(huandao_r[huandao_count] + (CAR_WIDTH / 2.0f));
 
     if (flag_huandao == 0) {
-        set_leftspeed = (int16)(normal_speed * huandao_speed_ratio);
-        set_rightspeed = normal_speed;
+        set_leftspeed = normal_speed;
+        set_rightspeed = (int16)(normal_speed / huandao_speed_ratio);
 
         if (euler.yaw >= huandao_enter_start_yaw + HUANDAO_ENTER_ANGLE) {
             huandao_inside_start_yaw = euler.yaw;
@@ -81,8 +87,8 @@ void Huandao_EnterCircle(void) {
         }
     }
     else {
-        set_leftspeed = normal_speed;
-        set_rightspeed = (int16)(normal_speed * huandao_speed_ratio);
+        set_leftspeed = (int16)(normal_speed / huandao_speed_ratio);
+        set_rightspeed = normal_speed;
 
         if (euler.yaw <= huandao_enter_start_yaw - HUANDAO_ENTER_ANGLE) {
             huandao_inside_start_yaw = euler.yaw;
@@ -98,7 +104,7 @@ void Huandao_EnterCircle(void) {
 void Huandao_InsideCircle(void) {
     if (flag_huandao == 0) {
         if (euler.yaw < huandao_inside_start_yaw + HUANDAO_INSIDE_ANGLE) {
-            CarControl_NormalMode(200, 800);
+            CarControl_NormalMode(250, 1000);
         }
         else {
             flag = 7;

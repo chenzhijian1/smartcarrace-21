@@ -52,6 +52,7 @@ extern uint8 count_flag_4;      // TOF判断次数
 extern volatile uint8 flag_gyro_z;
 extern volatile uint8 gyro_update_ticks;       // 陀螺仪数据就绪标志
 extern uint8 uart_output_mode;
+extern volatile uint16 uart_feedback_hold_ticks;
 
 /*---------------------------------------------------------------------------
  * 函数声明

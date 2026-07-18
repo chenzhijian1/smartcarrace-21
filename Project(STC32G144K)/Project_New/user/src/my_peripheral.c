@@ -22,6 +22,14 @@ uint8 count_flag = 0;
 static uint8 uart_cmd_buf[50];
 static uint8 uart_cmd_rx_data[16];
 static uint8 uart_cmd_index = 0;
+volatile uint16 uart_feedback_hold_ticks = 0;
+extern uint8 send_flag;
+
+static void uart_feedback_hold_start(void)
+{
+    uart_feedback_hold_ticks = 400;
+    send_flag = 0;
+}
 
 static void uart_command_print_params(void)
 {
@@ -32,6 +40,7 @@ static void uart_command_print_params(void)
     printf("%.2f,", s);
     printf("%.2f,%.2f,", A_, B_);
     printf("%.2f\r\n", C_);
+    uart_feedback_hold_start();
 }
 
 static float uart_cmd_to_float(const char *str)
@@ -93,6 +102,7 @@ static uint8 uart_command_apply(char *cmd)
     {
         uart_output_mode = (uint8)(cmd[1] - '0');
         printf("mode,%d\r\n", uart_output_mode);
+        uart_feedback_hold_start();
         return 1;
     }
 
@@ -101,6 +111,7 @@ static uint8 uart_command_apply(char *cmd)
     {
         flag = (uint8)(cmd[1] - '0');
         printf("flag,%d\r\n", flag);
+        uart_feedback_hold_start();
         return 1;
     }
 
@@ -140,6 +151,7 @@ static uint8 uart_command_apply(char *cmd)
         case 'u':                           // u+数值: 修改负压风扇启动目标 PWM，占空比范围 0~10000
             suction_fan_pwm_start = (uint16)motor_pwm_limit((int)value);
             printf("fan_start,%d\r\n", suction_fan_pwm_start);
+            uart_feedback_hold_start();
             return 1;
 
         case 's': s = value; break;         // s+数值: 修改弯道速度衰减系数 s
