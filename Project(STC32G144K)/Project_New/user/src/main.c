@@ -34,13 +34,17 @@ void uart_telemetry_print(void)
             break;
 
         case 3:
-            printf("%d,%d,%d,", imu660rc_gyro_x, imu660rc_gyro_y, imu660rc_gyro_z);
-            printf("%d,%d,%d,", imu660rc_acc_x, imu660rc_acc_y, imu660rc_acc_z);
-            printf("%.4f,%.4f,", q.q1, q.q2);
-            printf("%.2f,%.2f,%.2f\r\n", euler.roll, euler.pitch, euler.yaw);
+            // printf("%d,%d,%d,", imu660rc_gyro_x, imu660rc_gyro_y, imu660rc_gyro_z);
+            // printf("%d,%d,%d,", imu660rc_acc_x, imu660rc_acc_y, imu660rc_acc_z);
+            // printf("%.4f,%.4f,", q.q1, q.q2);
+            // printf("%.2f,%.2f,%.2f\r\n", euler.roll, euler.pitch, euler.yaw);
+            printf("%d,%.2f,", imu660rc_gyro_z, gyro_offset_z);
+            printf("%.3f,%.2f\r\n",
+                   (float)(imu660rc_gyro_z - gyro_offset_z) / imu660rc_transition_factor[1],
+                   euler.yaw);
             break;
         default:
-            uart_output_mode = 0;
+            uart_output_mode = 2;
             break;
     }
 }
@@ -75,7 +79,8 @@ void main(void)
         printf("\r\nIMU660RC init error.");
         system_delay_ms(300);
     }
-    Gyro_Calibration(200);
+    system_delay_ms(1000);
+    Gyro_Calibration(400);
 
     // Config_Init();
     // Huandao_Init();
@@ -84,8 +89,6 @@ void main(void)
     // motor_left_control(2000);
     // motor_right_control(2000);
 
-    suction_fan_on(5000);
-
     normal_speed = 0;
 
     pit_ms_init(TIM0_PIT, 5, TM0_IRQHandler);
@@ -93,8 +96,6 @@ void main(void)
 
     while (1)
     {
-        gpio_set_level(IO_P07, GPIO_HIGH);
-
         uart_command_poll();
 
         if (flag_gyro_z)

@@ -15,9 +15,6 @@ extern volatile uint8 element_state;
 
 extern float element_pre_h_threshold;
 extern float element_circle_h_threshold;
-extern float element_circle_side_delta;
-extern float element_cross_v_exit_threshold;
-extern float element_suspect_min_distance;
 extern float element_suspect_max_distance;
 extern float element_rearm_h_threshold;
 

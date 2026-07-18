@@ -12,12 +12,12 @@
  *============================================================================*/
 
 /*---------------------------------------------------------------------------
- * UI结构体实例
+ * UI结构体实�?
  *---------------------------------------------------------------------------*/
 ui_struct ui = {&UI_Display, 1, 0, 0};
 
 /*---------------------------------------------------------------------------
- * 按键状态变量
+ * 按键状态变�?
  *---------------------------------------------------------------------------*/
 uint8 key1_status = 1;
 uint8 key2_status = 1;
@@ -35,7 +35,7 @@ uint8 key3_flag = 0;
 uint8 key4_flag = 0;
 
 /*---------------------------------------------------------------------------
- * 拨码开关状态变量
+ * 拨码开关状态变�?
  *---------------------------------------------------------------------------*/
 uint8 sw1_status = 0;
 uint8 sw2_status = 0;
@@ -84,7 +84,7 @@ unsigned char xdata ui_page3[8][30] = {
     "  huandao_dir",
     "  huandao_r",
     "  dis_before_each",
-    "  g_angle_inside",
+    "",
     "",
     "  <EXIT>---------------------"
 };
@@ -107,7 +107,7 @@ unsigned char xdata ui_page5[8][30] = {
     "  dis_before_2",
     "  dis_before_3",
     "  dis_before_4",
-    "  dis_before_5",
+    "",
     "  <EXIT>---------------------"
 };
 
@@ -118,7 +118,7 @@ unsigned char xdata ui_page6[8][30] = {
     "  dir_2 (0L/1R)",
     "  dir_3 (0L/1R)",
     "  dir_4 (0L/1R)",
-    "  dir_5 (0L/1R)",
+    "",
     "  <EXIT>---------------------"
 };
 
@@ -129,23 +129,12 @@ unsigned char xdata ui_page7[8][30] = {
     "  r_2",
     "  r_3",
     "  r_4",
-    "  r_5",
-    "  <EXIT>---------------------"
-};
-
-unsigned char xdata ui_page8[8][30] = {
-    "  <g_angle_inside>     <page8>",
-    "  angle_inside_0",
-    "  angle_inside_1", 
-    "  angle_inside_2",
-    "  angle_inside_3",
-    "  angle_inside_4",
-    "  angle_inside_5",
+    "",
     "  <EXIT>---------------------"
 };
 
 /*---------------------------------------------------------------------------
- * 显示字符串数组(带光标)
+ * 显示字符串数�?带光�?
  *---------------------------------------------------------------------------*/
 void UI_DispStrings(uint8 strings[8][30]) {
     uint8 i;
@@ -162,7 +151,7 @@ void UI_DispStrings(uint8 strings[8][30]) {
 }
 
 /*---------------------------------------------------------------------------
- * 主菜单显示函数
+ * 主菜单显示函�?
  *---------------------------------------------------------------------------*/
 void UI_Display(void) {
     switch (ui.page) {
@@ -233,7 +222,6 @@ void UI_Display(void) {
             ips114_show_string(155, 2, "-> page6");
             ips114_show_string(155, 3, "-> page7");
             ips114_show_string(155, 4, "-> page5");
-            ips114_show_string(155, 5, "-> page8");
         }
         else if (ui.last != ui.page) {
             ui.cursor = 1;
@@ -244,7 +232,6 @@ void UI_Display(void) {
             ips114_show_string(155, 2, "-> page6");
             ips114_show_string(155, 3, "-> page7");
             ips114_show_string(155, 4, "-> page5");
-            ips114_show_string(155, 5, "-> page8");
         }
         break;
 
@@ -268,7 +255,6 @@ void UI_Display(void) {
             ips114_show_float(155, 3, distance_before_huandao[2], 3, 2);
             ips114_show_float(155, 4, distance_before_huandao[3], 3, 2);
             ips114_show_float(155, 5, distance_before_huandao[4], 3, 2);
-            ips114_show_float(155, 6, distance_before_huandao[5], 3, 2);
         }
         else if (ui.last != ui.page) {
             ui.cursor = 1;
@@ -280,7 +266,6 @@ void UI_Display(void) {
             ips114_show_float(155, 3, distance_before_huandao[2], 3, 2);
             ips114_show_float(155, 4, distance_before_huandao[3], 3, 2);
             ips114_show_float(155, 5, distance_before_huandao[4], 3, 2);
-            ips114_show_float(155, 6, distance_before_huandao[5], 3, 2);
         }
         break;
 
@@ -292,7 +277,6 @@ void UI_Display(void) {
             ips114_show_uint8(155, 3, huandao_dir[2]);
             ips114_show_uint8(155, 4, huandao_dir[3]);
             ips114_show_uint8(155, 5, huandao_dir[4]);
-            ips114_show_uint8(155, 6, huandao_dir[5]);
         }
         else if (ui.last != ui.page) {
             ui.cursor = 1;
@@ -304,7 +288,6 @@ void UI_Display(void) {
             ips114_show_uint8(155, 3, huandao_dir[2]);
             ips114_show_uint8(155, 4, huandao_dir[3]);
             ips114_show_uint8(155, 5, huandao_dir[4]);
-            ips114_show_uint8(155, 6, huandao_dir[5]);
         }
         break;
 
@@ -316,7 +299,6 @@ void UI_Display(void) {
             ips114_show_uint8(155, 3, huandao_r[2]);
             ips114_show_uint8(155, 4, huandao_r[3]);
             ips114_show_uint8(155, 5, huandao_r[4]);
-            ips114_show_uint8(155, 6, huandao_r[5]);
         }
         else if (ui.last != ui.page) {
             ui.cursor = 1;
@@ -328,31 +310,6 @@ void UI_Display(void) {
             ips114_show_uint8(155, 3, huandao_r[2]);
             ips114_show_uint8(155, 4, huandao_r[3]);
             ips114_show_uint8(155, 5, huandao_r[4]);
-            ips114_show_uint8(155, 6, huandao_r[5]);
-        }
-        break;
-
-    case 8:
-        if (ui.last == ui.page) {
-            UI_DispStrings(ui_page8);
-            ips114_show_float(155, 1, g_angle_inside[0], 3, 2);
-            ips114_show_float(155, 2, g_angle_inside[1], 3, 2);
-            ips114_show_float(155, 3, g_angle_inside[2], 3, 2);
-            ips114_show_float(155, 4, g_angle_inside[3], 3, 2);
-            ips114_show_float(155, 5, g_angle_inside[4], 3, 2);
-            ips114_show_float(155, 6, g_angle_inside[5], 3, 2);
-        }
-        else if (ui.last != ui.page) {
-            ui.cursor = 1;
-            ui.last = ui.page;
-            ips114_clear(RGB565_BLACK);
-            UI_DispStrings(ui_page8);
-            ips114_show_float(155, 1, g_angle_inside[0], 3, 2);
-            ips114_show_float(155, 2, g_angle_inside[1], 3, 2);
-            ips114_show_float(155, 3, g_angle_inside[2], 3, 2);
-            ips114_show_float(155, 4, g_angle_inside[3], 3, 2);
-            ips114_show_float(155, 5, g_angle_inside[4], 3, 2);
-            ips114_show_float(155, 6, g_angle_inside[5], 3, 2);
         }
         break;
 
@@ -418,34 +375,28 @@ void UI_KeyScan(void) {
             else if (ui.cursor == 7) ui.page = 0;
             break;
         case 3:
-            if (ui.cursor == 1) huandao_num += 1;
+            if (ui.cursor == 1 && huandao_num < HUANDAO_MAX_COUNT) huandao_num += 1;
             else if (ui.cursor == 2) ui.page = 6;
             else if (ui.cursor == 3) ui.page = 7;
             else if (ui.cursor == 4) ui.page = 5;
-            else if (ui.cursor == 5) ui.page = 8;
             else if (ui.cursor == 7) ui.page = 0;
             break;
         case 4:
             if (ui.cursor == 7) ui.page = 0;
             break;
         case 5:
-            if (ui.cursor >= 1 && ui.cursor <= 6)
+            if (ui.cursor >= 1 && ui.cursor <= HUANDAO_MAX_COUNT)
                 distance_before_huandao[ui.cursor - 1] += 10;
             else if (ui.cursor == 7) ui.page = 3;
             break;
         case 6:
-            if (ui.cursor >= 1 && ui.cursor <= 6)
+            if (ui.cursor >= 1 && ui.cursor <= HUANDAO_MAX_COUNT)
                 huandao_dir[ui.cursor - 1] = !huandao_dir[ui.cursor - 1];
             else if (ui.cursor == 7) ui.page = 3;
             break;
         case 7:
-            if (ui.cursor >= 1 && ui.cursor <= 6)
+            if (ui.cursor >= 1 && ui.cursor <= HUANDAO_MAX_COUNT)
                 huandao_r[ui.cursor - 1] += 5;
-            else if (ui.cursor == 7) ui.page = 3;
-            break;
-        case 8:
-            if (ui.cursor >= 1 && ui.cursor <= 6)
-                g_angle_inside[ui.cursor - 1] += 5;
             else if (ui.cursor == 7) ui.page = 3;
             break;
         default:
@@ -478,34 +429,28 @@ void UI_KeyScan(void) {
             else if (ui.cursor == 7) ui.page = 0;
             break;
         case 3:
-            if (ui.cursor == 1) huandao_num -= 1;
+            if (ui.cursor == 1 && huandao_num > 1) huandao_num -= 1;
             else if (ui.cursor == 2) ui.page = 6;
             else if (ui.cursor == 3) ui.page = 7;
             else if (ui.cursor == 4) ui.page = 5;
-            else if (ui.cursor == 5) ui.page = 8;
             else if (ui.cursor == 7) ui.page = 0;
             break;
         case 4:
             if (ui.cursor == 7) ui.page = 0;
             break;
         case 5:
-            if (ui.cursor >= 1 && ui.cursor <= 6)
+            if (ui.cursor >= 1 && ui.cursor <= HUANDAO_MAX_COUNT)
                 distance_before_huandao[ui.cursor - 1] -= 10;
             else if (ui.cursor == 7) ui.page = 3;
             break;
         case 6:
-            if (ui.cursor >= 1 && ui.cursor <= 6)
+            if (ui.cursor >= 1 && ui.cursor <= HUANDAO_MAX_COUNT)
                 huandao_dir[ui.cursor - 1] = !huandao_dir[ui.cursor - 1];
             else if (ui.cursor == 7) ui.page = 3;
             break;
         case 7:
-            if (ui.cursor >= 1 && ui.cursor <= 6)
+            if (ui.cursor >= 1 && ui.cursor <= HUANDAO_MAX_COUNT)
                 huandao_r[ui.cursor - 1] -= 5;
-            else if (ui.cursor == 7) ui.page = 3;
-            break;
-        case 8:
-            if (ui.cursor >= 1 && ui.cursor <= 6)
-                g_angle_inside[ui.cursor - 1] -= 5;
             else if (ui.cursor == 7) ui.page = 3;
             break;
         default:
@@ -516,7 +461,7 @@ void UI_KeyScan(void) {
 }
 
 /*---------------------------------------------------------------------------
- * 运行时数据显示
+ * 运行时数据显�?
  *---------------------------------------------------------------------------*/
 void UI_ShowRuntime(void) {
     ips114_show_string(0, 0, "n");

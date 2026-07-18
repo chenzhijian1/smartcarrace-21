@@ -88,14 +88,19 @@ static uint8 uart_command_apply(char *cmd)
     float value;
     uint8 applied = 1;
 
-    if (cmd[0] == 't' && cmd[1] == '\0')
+    // t0~t3: 选择串口输出模式，对应 main.c 中 uart_telemetry_print 的 case 0~3
+    if (cmd[0] == 't' && cmd[1] >= '0' && cmd[1] <= '3' && cmd[2] == '\0')
     {
-        uart_output_mode++;
-        if (uart_output_mode >= 4)
-        {
-            uart_output_mode = 0;
-        }
+        uart_output_mode = (uint8)(cmd[1] - '0');
         printf("mode,%d\r\n", uart_output_mode);
+        return 1;
+    }
+
+    // f0~f9: 直接修改车辆状态 flag，例如 f4 进入起步状态，f5 进入慢速停车状态
+    if (cmd[0] == 'f' && cmd[1] >= '0' && cmd[1] <= '9' && cmd[2] == '\0')
+    {
+        flag = (uint8)(cmd[1] - '0');
+        printf("flag,%d\r\n", flag);
         return 1;
     }
 
@@ -108,34 +113,40 @@ static uint8 uart_command_apply(char *cmd)
 
     switch (cmd[0])
     {
-        case 'a': kpa = value; break;
-        case 'b': kpb = value; break;
-        case 'd': kd = value; break;
-        case 'D': kd_imu = value; break;
+        case 'a': kpa = value; break;       // a+数值: 修改方向环比例系数 kpa
+        case 'b': kpb = value; break;       // b+数值: 修改方向环非线性系数 kpb
+        case 'd': kd = value; break;        // d+数值: 修改方向环微分系数 kd
+        case 'D': kd_imu = value; break;    // D+数值: 修改陀螺仪角速度反馈系数 kd_imu
 
-        case 'p':
+        case 'p':                           // p+数值: 修改速度环 P，并同步到左右电机
             kp_motor = value;
             motor_left.Kp_motor = kp_motor;
             motor_right.Kp_motor = kp_motor;
             break;
 
-        case 'i':
+        case 'i':                           // i+数值: 修改速度环 I，并同步到左右电机
             ki_motor = value;
             motor_left.Ki_motor = ki_motor;
             motor_right.Ki_motor = ki_motor;
             break;
 
-        case 'n':
+        case 'n':                           // n+数值: 修改目标速度 normal_speed，n0 触发软停车
             if ((int16)value == 0)
                 CarControl_RequestSoftStop();
             else
                 normal_speed = (int16)value;
             break;
-        case 's': s = value; break;
-        case 'A': A_ = value; break;
-        case 'B': B_ = value; break;
-        case 'C': C_ = value; break;
-        default: applied = 0; break;
+
+        case 'u':                           // u+数值: 修改负压风扇启动目标 PWM，占空比范围 0~10000
+            suction_fan_pwm_start = (uint16)motor_pwm_limit((int)value);
+            printf("fan_start,%d\r\n", suction_fan_pwm_start);
+            return 1;
+
+        case 's': s = value; break;         // s+数值: 修改弯道速度衰减系数 s
+        case 'A': A_ = value; break;        // A+数值: 修改电感误差公式系数 A_
+        case 'B': B_ = value; break;        // B+数值: 修改电感误差公式系数 B_
+        case 'C': C_ = value; break;        // C+数值: 修改电感误差公式系数 C_
+        default: applied = 0; break;        // 未识别命令: 不修改参数，也不回显参数表
     }
 
     if (applied)
@@ -171,11 +182,19 @@ void uart_command_poll(void)
 
     for (i = 0; i < len; i++)
     {
-        if (uart_cmd_index == 0 && uart_cmd_rx_data[i] == 't')
+        if (uart_cmd_index == 1 && uart_cmd_buf[0] == 't' && uart_cmd_rx_data[i] >= '0' && uart_cmd_rx_data[i] <= '3')
         {
-            uart_cmd_buf[0] = 't';
-            uart_cmd_buf[1] = '\0';
+            uart_cmd_buf[1] = uart_cmd_rx_data[i];
+            uart_cmd_buf[2] = '\0';
             uart_command_apply((char *)uart_cmd_buf);
+            uart_cmd_index = 0;
+        }
+        else if (uart_cmd_index == 1 && uart_cmd_buf[0] == 'f' && uart_cmd_rx_data[i] >= '0' && uart_cmd_rx_data[i] <= '9')
+        {
+            uart_cmd_buf[1] = uart_cmd_rx_data[i];
+            uart_cmd_buf[2] = '\0';
+            uart_command_apply((char *)uart_cmd_buf);
+            uart_cmd_index = 0;
         }
         else if (uart_cmd_rx_data[i] == '\r' || uart_cmd_rx_data[i] == '\n')
         {

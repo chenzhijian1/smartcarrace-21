@@ -6,15 +6,15 @@
 #include "element.h"
 #include "navigation.h"
 #include "quaternion.h"
-#include "zf_device_imu963ra.h"
+#include "zf_device_imu660rc.h"
 
 /*============================================================================
- * 模块说明：车辆控制模块
- * 功能：状态机管理、速度策略、方向控制
+ * 模块说明：车辆控制模�?
+ * 功能：状态机管理、速度策略、方向控�?
  *============================================================================*/
 
 /*---------------------------------------------------------------------------
- * 状态标志变量
+ * 状态标志变�?
  *---------------------------------------------------------------------------*/
 uint8 flag = 0;
 uint8 flag_stop = 0;
@@ -34,7 +34,7 @@ int16 set_rightspeed = 0;
 int16 speed_huandao = 0;
 
 /*---------------------------------------------------------------------------
- * 编码器相关
+ * 编码器相�?
  *---------------------------------------------------------------------------*/
 float encoder_ave = 0.0;
 float encoder_temp = 0.0;
@@ -49,18 +49,21 @@ float last_gyro_z = 0;
 float lpf_gyro = 0.2;
 
 uint8 cnt_stop = 0;
-uint8 cnt_launch = 0;
+uint16 cnt_launch = 0;
 static volatile int16 soft_stop_start_speed = 0;
+static uint8 launch_ready = 1;
 
 /*---------------------------------------------------------------------------
  * 风扇控制
  *---------------------------------------------------------------------------*/
 uint8 flag_suction_fan_off = 0;
 
-// EEPROM默认值
+// EEPROM默认�?
 static uint8 flag_suction_fan_off_iap = 0;
 
 #define error_turn 17.0f
+uint16 suction_fan_pwm_start = 5000;
+#define LAUNCH_FAN_DELAY_TICKS   400
 
 /*---------------------------------------------------------------------------
  * 正常循迹模式 (flag=0)
@@ -96,21 +99,25 @@ void CarControl_NormalMode(int16 c_speed, int16 s_speed) {
  * 起步发车模式 (flag=4)
  *---------------------------------------------------------------------------*/
 void CarControl_LaunchMode(void) {
-    // 发车时先打开风扇
-    if (cnt_launch == 0) {
-        if (flag_suction_fan_off == 0)
-            suction_fan_on(2000);
+    uint16 fan_pwm;
+
+    if (cnt_launch < LAUNCH_FAN_DELAY_TICKS) {
+        cnt_launch++;
+
+        if (flag_suction_fan_off == 0) {
+            fan_pwm = (uint16)((uint32)suction_fan_pwm_start * cnt_launch / LAUNCH_FAN_DELAY_TICKS);
+            suction_fan_on(fan_pwm);
+        }
     }
-    
-    cnt_launch++;
-    
-    // 直接切换到正常循迹模式
-    flag = 0;
-    cnt_launch = 0;
+
+    if (cnt_launch >= LAUNCH_FAN_DELAY_TICKS) {
+        cnt_launch = 0;
+        flag = 0;
+    }
 }
 
 /*---------------------------------------------------------------------------
- * 慢速停车模式 (flag=5)
+ * 慢速停车模�?(flag=5)
  *---------------------------------------------------------------------------*/
 void CarControl_StopMode(void) {
     if (cnt_stop < 200) {
@@ -144,13 +151,24 @@ void CarControl_RequestSoftStop(void) {
  * 车辆状态更新主函数 (原speed_change)
  *---------------------------------------------------------------------------*/
 void CarControl_Update(void) {
+    if (normal_speed == 0) {
+        launch_ready = 1;
+        cnt_launch = 0;
+        suction_fan_off();
+    }
+    else if (launch_ready) {
+        launch_ready = 0;
+        cnt_launch = 0;
+        flag = 4;
+    }
+
     if (flag_stop == 0) {
         // 使用四元数解算的角速度数据（已在IMU_Update中处理）
-        // 从IMU963读取的陀螺仪原始数据并转换
+        // 从IMU963读取的陀螺仪原始数据并转�?
         // IMU963RA陀螺仪±2000dps量程，灵敏度70 mdps/LSB = 0.07 dps/LSB
-        if (imu963ra_gyro_z <= 4 && imu963ra_gyro_z >= -4)
-            imu963ra_gyro_z = 0;
-        gyro_z = (float)(imu963ra_gyro_z - gyro_offset_z) / imu963ra_transition_factor[1];
+        if (imu660rc_gyro_z <= 4 && imu660rc_gyro_z >= -4)
+            imu660rc_gyro_z = 0;
+        gyro_z = (float)(imu660rc_gyro_z - gyro_offset_z) / imu660rc_transition_factor[1];
 
         switch (flag) {
             case 0:  // 正常模式
@@ -177,7 +195,7 @@ void CarControl_Update(void) {
                 CarControl_LaunchMode();
                 break;
 
-            case 5:  // 慢速停车
+            case 5:  // 慢速停�?
                 CarControl_StopMode();
                 break;
 
@@ -217,12 +235,12 @@ void dir_pid(float error, float last_error, float gyro) {
 }
 
 /*---------------------------------------------------------------------------
- * 速度调整(差速计算)
+ * 速度调整(差速计�?
  *---------------------------------------------------------------------------*/
 void speed_adjust(int16 c_speed, int16 s_speed) {
     changed_speed = MINMAX(changed_speed, -c_speed, c_speed);
 
-    k = fabs(aaddcc.err_dir / 60.0f);
+    k = fabs(aaddcc.err_dir / 40.0f);
     if (changed_speed > 0) {
         set_leftspeed = test_speed - changed_speed * (1 + k);
         set_rightspeed = test_speed + changed_speed;
@@ -237,7 +255,7 @@ void speed_adjust(int16 c_speed, int16 s_speed) {
 }
 
 /*---------------------------------------------------------------------------
- * 车辆控制参数初始化（从EEPROM读取）
+ * 车辆控制参数初始化（从EEPROM读取�?
  *---------------------------------------------------------------------------*/
 void CarControl_Init(void) {
     // 读取风扇控制标志

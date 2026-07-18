@@ -23,35 +23,23 @@
 
 #define HUANDAO_DIR_SOURCE_ROUTE  (0)
 #define HUANDAO_DIR_SOURCE_SENSOR (1)
+#define HUANDAO_MAX_COUNT          (5)
 
 /*---------------------------------------------------------------------------
  * 环岛参数配置
  *---------------------------------------------------------------------------*/
 extern uint8 huandao_num;                   // 环岛个数
 extern uint8 huandao_count;                 // 环岛计数
-extern uint8 huandao_dir[6];                // 环岛方向 (0:左, 1:右)
-extern uint8 huandao_dir_source[6];         // 方向来源 (0:预设, 1:横电感)
-extern uint8 huandao_r[6];                  // 环岛半径
-extern float distance_before_huandao[6];    // 环岛前距离
-extern float distance_after_huandao;        // 环岛后距离
-extern float g_angle_turn;                  // 入环转角
-extern float g_angle_inside[6];             // 环内角度
-extern float angle_in_threshold;            // 入环角度阈值
-extern float angle_out_threshold;           // 出环角度阈值
+extern uint8 huandao_dir[HUANDAO_MAX_COUNT];
+// 环岛方向：0 为左环（逆时针、航向角增加），1 为右环（顺时针、航向角减少）。
+extern uint8 huandao_dir_source[HUANDAO_MAX_COUNT];
+extern uint8 huandao_r[HUANDAO_MAX_COUNT];
+extern float distance_before_huandao[HUANDAO_MAX_COUNT];
 
 /*---------------------------------------------------------------------------
  * 环岛状态变量
  *---------------------------------------------------------------------------*/
 extern uint8 flag_huandao;      // 0:左环岛, 1:右环岛
-extern uint8 flag_set_angle;    // 是否已设置入环角度
-extern uint16 flag_circle_in;   // 入环标志
-extern uint16 flag_circle_out;  // 出环标志
-
-extern float ratio;             // 差速比例
-extern float target_angle_in;       // 入环起始角度
-extern float target_angle_in_end;   // 入环目标角度
-extern float target_angle_inside;   // 环内目标角度
-extern float target_angle_out;      // 出环目标角度
 
 /*---------------------------------------------------------------------------
  * 函数声明

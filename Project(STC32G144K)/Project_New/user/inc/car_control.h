@@ -4,33 +4,33 @@
 #include "headfile.h"
 
 /*============================================================================
- * 模块说明：车辆控制模块
- * 功能：
+ * 模块说明：车辆控制模�?
+ * 功能�?
  *   1. 车辆状态机管理
  *   2. 速度策略控制
  *   3. 方向PID控制执行
- *   4. 软启动/软停车
+ *   4. 软启�?软停�?
  * 
- * 参数设计：
+ * 参数设计�?
  *   - PID参数在config.h中管理（需要频繁调试）
  *   - 本模块管理运行时状态变量和辅助参数
  *============================================================================*/
 
 /*---------------------------------------------------------------------------
- * 状态标志定义
- * flag值含义:
+ * 状态标志定�?
+ * flag值含�?
  *   0: 正常循迹模式
- *   1: 预环岛模式
+ *   1: 预环岛模�?
  *   2: 入环模式
  *   3: 环内循迹
  *   4: 起步发车
- *   5: 慢速停车
+ *   5: 慢速停�?
  *   7: 出环直行
  *---------------------------------------------------------------------------*/
-extern uint8 flag;              // 车辆状态
+extern uint8 flag;              // 车辆状�?
 extern uint8 flag_stop;         // 停止标志
 extern uint8 flag_key_control;  // 控制模式: 0调参 1跑车
-extern uint8 flag_key_fast;     // 快速模式标志
+extern uint8 flag_key_fast;     // 快速模式标�?
 extern uint8 nav_end_flag_sent; // 导航结束标志
 
 /*---------------------------------------------------------------------------
@@ -45,42 +45,42 @@ extern int16 set_rightspeed;    // 右轮设定速度
 extern int16 speed_huandao;     // 环岛速度
 
 /*---------------------------------------------------------------------------
- * 编码器相关
+ * 编码器相�?
  *---------------------------------------------------------------------------*/
-extern float encoder_ave;       // 编码器平均积分值
-extern float encoder_temp;      // 编码器临时值(用于距离计算)
+extern float encoder_ave;       // 编码器平均积分�?
+extern float encoder_temp;      // 编码器临时�?用于距离计算)
 
 /*---------------------------------------------------------------------------
  * 其他控制变量
  *---------------------------------------------------------------------------*/
-extern float k;                 // 差速调整系数
+extern float k;                 // 差速调整系�?
 extern float s;                 // 速度衰减系数
 extern float gyro_z;            // 滤波后的角速度
 extern float last_gyro_z;       // 上次角速度
-extern float lpf_gyro;          // 陀螺仪低通滤波系数
+extern float lpf_gyro;          // 陀螺仪低通滤波系�?
 
 extern uint8 cnt_stop;          // 软停车计数器
-extern uint8 cnt_launch;        // 发车计数器
-
+extern uint16 cnt_launch;       // 发车计数�?
 /*---------------------------------------------------------------------------
  * 风扇控制
  *---------------------------------------------------------------------------*/
 extern uint8 flag_suction_fan_off;
+extern uint16 suction_fan_pwm_start;
 
 /*---------------------------------------------------------------------------
  * 函数声明
  *---------------------------------------------------------------------------*/
 // 初始化和配置
-void CarControl_Init(void);         // 车辆控制参数初始化
+void CarControl_Init(void);         // 车辆控制参数初始�?
 void CarControl_SaveConfig(void);   // 保存车辆控制参数
 
-// 主控制函数
-void CarControl_Update(void);       // 车辆状态更新(原speed_change)
+// 主控制函�?
+void CarControl_Update(void);       // 车辆状态更�?原speed_change)
 
 // 模式处理函数
 void CarControl_NormalMode(int16 c_speed, int16 s_speed);
 void CarControl_LaunchMode(void);   // 起步发车模式(flag=4)
-void CarControl_StopMode(void);     // 慢速停车模式(flag=5)
+void CarControl_StopMode(void);     // 慢速停车模�?flag=5)
 
 // 方向控制
 void dir_pid(float error, float last_error, float gyro);    // 方向PID

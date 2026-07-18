@@ -81,6 +81,11 @@ void TM4_IRQHandler(void) interrupt TMR4_VECTOR
 
     if (car_stop_judge() || voltage_battery_is_low() || (normal_speed == 0 && flag != 5))
     {
+        suction_fan_off();
+        motor_control_stop();
+    }
+    else if (flag == 4)
+    {
         motor_control_stop();
     }
     else

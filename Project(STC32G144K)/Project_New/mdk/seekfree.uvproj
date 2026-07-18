@@ -710,14 +710,14 @@
               <FilePath>..\..\libraries\zf_device\zf_device_imu660rb.h</FilePath>
             </File>
             <File>
-              <FileName>zf_device_imu963ra.c</FileName>
+              <FileName>zf_device_imu660rc.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\..\libraries\zf_device\zf_device_imu963ra.c</FilePath>
+              <FilePath>..\..\libraries\zf_device\zf_device_imu660rc.c</FilePath>
             </File>
             <File>
-              <FileName>zf_device_imu963ra.h</FileName>
+              <FileName>zf_device_imu660rc.h</FileName>
               <FileType>5</FileType>
-              <FilePath>..\..\libraries\zf_device\zf_device_imu963ra.h</FilePath>
+              <FilePath>..\..\libraries\zf_device\zf_device_imu660rc.h</FilePath>
             </File>
           </Files>
         </Group>

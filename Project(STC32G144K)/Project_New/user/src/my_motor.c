@@ -303,13 +303,14 @@ void suction_fan_init(void)
 void suction_fan_on(int pwm)
 {
     pwm = motor_pwm_limit(pwm);
+    pwm_fan = motor_pwm_abs(pwm);
     SUCTION_FAN_DIR = 1;
-    pwm_set_duty(SUCTION_FAN_PWM, MOTOR_PWM_MAX - motor_pwm_abs(pwm));
+    pwm_set_duty(SUCTION_FAN_PWM, MOTOR_PWM_MAX - pwm_fan);
 }
 
 void suction_fan_off(void)
 {
     pwm_fan = 0;
-    SUCTION_FAN_DIR = 1;
+    SUCTION_FAN_DIR = 0;
     pwm_set_duty(SUCTION_FAN_PWM, MOTOR_PWM_MAX);
 }

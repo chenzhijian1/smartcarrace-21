@@ -143,7 +143,7 @@ void fast_tracking(void) {
 
 void refresh(void) {
     encoder_clear();
-    euler.yaw = 0;  // 使用euler.yaw代替yaw
+    Yaw_Reset();
     
     // 重置记录状态
     record_state = RECORD_SAMPLING;
