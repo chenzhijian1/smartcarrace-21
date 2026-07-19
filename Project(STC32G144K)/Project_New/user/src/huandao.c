@@ -7,10 +7,10 @@
 #include "quaternion.h"
 #include "navigation.h"
 
-#define HUANDAO_ENTER_ANGLE 30.0f
-#define HUANDAO_INSIDE_ANGLE 300.0f
+#define HUANDAO_ENTER_ANGLE 60.0f
+#define HUANDAO_INSIDE_ANGLE 280.0f
 #define HUANDAO_EXIT_DISTANCE 250.0f
-#define HUANDAO_DEBUG_STOP_ON_FLAG2 0
+#define HUANDAO_ENTRY_BIAS_RATIO 0.60f
 
 /*============================================================================
  * 模块说明：环岛控制模块
@@ -39,7 +39,6 @@ static uint8 huandao_r_iap[HUANDAO_MAX_COUNT] = {30, 35, 30, 30, 30};
  *---------------------------------------------------------------------------*/
 uint8 flag_huandao = 0;         // 0:左环岛, 1:右环岛
 static uint8 huandao_angle_set = 0;
-static float huandao_speed_ratio = 0.0f;
 static float huandao_enter_start_yaw = 0.0f;
 static float huandao_inside_start_yaw = 0.0f;
 
@@ -56,11 +55,6 @@ void Huandao_PreCircle(void) {
     else {
         huandao_angle_set = 0;
         flag = 2;
-#if HUANDAO_DEBUG_STOP_ON_FLAG2
-        set_leftspeed = 0;
-        set_rightspeed = 0;
-        flag_stop = 1;
-#endif
     }
 }
 
@@ -74,26 +68,41 @@ void Huandao_EnterCircle(void) {
         huandao_angle_set = 1;
     }
 
-    huandao_speed_ratio = (float)(huandao_r[huandao_count] - (CAR_WIDTH / 2.0f)) /
-                          (float)(huandao_r[huandao_count] + (CAR_WIDTH / 2.0f));
+    dir_pid(aaddcc.err_dir, aaddcc.last_err_dir, gyro_z);
+    normal_speed_cal = (int16)-s * aaddcc.err_dir * aaddcc.err_dir + normal_speed;
+    normal_speed_pre = normal_speed;
+    test_speed = normal_speed_cal;
+
+    {
+        int16 entry_bias;
+
+        entry_bias = (int16)((float)normal_speed * HUANDAO_ENTRY_BIAS_RATIO);
+        if (entry_bias < 0) {
+            entry_bias = 0;
+        }
+
+        // changed_speed > 0 turns left; changed_speed < 0 turns right.
+        if (flag_huandao == 0) {
+            if (changed_speed < entry_bias) {
+                changed_speed = entry_bias;
+            }
+        }
+        else if (changed_speed > -entry_bias) {
+            changed_speed = -entry_bias;
+        }
+    }
+
+    speed_adjust(250, 1000);
 
     if (flag_huandao == 0) {
-        set_leftspeed = normal_speed;
-        set_rightspeed = (int16)(normal_speed / huandao_speed_ratio);
-
         if (euler.yaw >= huandao_enter_start_yaw + HUANDAO_ENTER_ANGLE) {
             huandao_inside_start_yaw = euler.yaw;
             flag = 3;
         }
     }
-    else {
-        set_leftspeed = (int16)(normal_speed / huandao_speed_ratio);
-        set_rightspeed = normal_speed;
-
-        if (euler.yaw <= huandao_enter_start_yaw - HUANDAO_ENTER_ANGLE) {
-            huandao_inside_start_yaw = euler.yaw;
-            flag = 3;
-        }
+    else if (euler.yaw <= huandao_enter_start_yaw - HUANDAO_ENTER_ANGLE) {
+        huandao_inside_start_yaw = euler.yaw;
+        flag = 3;
     }
 }
 
@@ -148,7 +157,6 @@ void Huandao_ExitStraight(void) {
 void Huandao_Reset(void) {
     flag_huandao = 0;
     huandao_angle_set = 0;
-    huandao_speed_ratio = 0.0f;
     huandao_enter_start_yaw = 0.0f;
     huandao_inside_start_yaw = 0.0f;
 }

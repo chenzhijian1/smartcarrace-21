@@ -38,14 +38,14 @@ void uart_telemetry_print(void)
             // printf("%d,%d,%d,", imu660rc_gyro_x, imu660rc_gyro_y, imu660rc_gyro_z);
             // printf("%d,%d,%d,", imu660rc_acc_x, imu660rc_acc_y, imu660rc_acc_z);
             // printf("%.4f,%.4f,", q.q1, q.q2);
-            // printf("%.2f,%.2f,%.2f\r\n", euler.roll, euler.pitch, euler.yaw);
-            printf("%d,%.2f,", imu660rc_gyro_z, gyro_offset_z);
-            printf("%.3f,%.2f\r\n",
-                   (float)(imu660rc_gyro_z - gyro_offset_z) / imu660rc_transition_factor[1],
-                   euler.yaw);
+            printf("%.2f,%.2f,%.2f\r\n", euler.roll, euler.pitch, euler.yaw);
+            // printf("%d,%.2f,", imu660rc_gyro_z, gyro_offset_z);
+            // printf("%.3f,%.2f\r\n",
+            //        (float)(imu660rc_gyro_z - gyro_offset_z) / imu660rc_transition_factor[1],
+            //        euler.yaw);
             break;
         default:
-            uart_output_mode = 2;
+            uart_output_mode = 0;
             break;
     }
 }
