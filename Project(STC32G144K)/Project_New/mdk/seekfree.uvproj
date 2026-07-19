@@ -883,6 +883,21 @@
               <FilePath>..\user\inc\spatial_features.h</FilePath>
             </File>
             <File>
+              <FileName>seesaw.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\user\inc\seesaw.h</FilePath>
+            </File>
+            <File>
+              <FileName>cylinder.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\user\inc\cylinder.h</FilePath>
+            </File>
+            <File>
+              <FileName>wall.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\user\inc\wall.h</FilePath>
+            </File>
+            <File>
               <FileName>SEEKFREE_IMU963RA.h</FileName>
               <FileType>5</FileType>
               <FilePath>..\user\inc\SEEKFREE_IMU963RA.h</FilePath>
@@ -971,6 +986,21 @@
               <FileName>spatial_features.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\user\src\spatial_features.c</FilePath>
+            </File>
+            <File>
+              <FileName>seesaw.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\user\src\seesaw.c</FilePath>
+            </File>
+            <File>
+              <FileName>cylinder.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\user\src\cylinder.c</FilePath>
+            </File>
+            <File>
+              <FileName>wall.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\user\src\wall.c</FilePath>
             </File>
             <File>
               <FileName>ui_menu.c</FileName>
