@@ -98,8 +98,8 @@ static uint8 uart_command_apply(char *cmd)
     float value;
     uint8 applied = 1;
 
-    // t0~t3: 选择串口输出模式，对应 main.c 中 uart_telemetry_print 的 case 0~3
-    if (cmd[0] == 't' && cmd[1] >= '0' && cmd[1] <= '3' && cmd[2] == '\0')
+    // t0~t5: 选择串口输出模式，对应 main.c 中 uart_telemetry_print 的 case 0~5
+    if (cmd[0] == 't' && cmd[1] >= '0' && cmd[1] <= '5' && cmd[2] == '\0')
     {
         uart_output_mode = (uint8)(cmd[1] - '0');
         printf("mode,%d\r\n", uart_output_mode);
@@ -201,7 +201,7 @@ void uart_command_poll(void)
 
     for (i = 0; i < len; i++)
     {
-        if (uart_cmd_index == 1 && uart_cmd_buf[0] == 't' && uart_cmd_rx_data[i] >= '0' && uart_cmd_rx_data[i] <= '3')
+        if (uart_cmd_index == 1 && uart_cmd_buf[0] == 't' && uart_cmd_rx_data[i] >= '0' && uart_cmd_rx_data[i] <= '5')
         {
             uart_cmd_buf[1] = uart_cmd_rx_data[i];
             uart_cmd_buf[2] = '\0';

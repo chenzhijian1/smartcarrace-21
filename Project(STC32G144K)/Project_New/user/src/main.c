@@ -1,11 +1,17 @@
 #include "headfile.h"
 #include "element.h"
+#include "spatial_features.h"
+#include "seesaw.h"
+#include "cylinder.h"
+#include "wall.h"
 
 uint8 send_flag = 1;
 uint8 uart_output_mode = 0;
 
 void uart_telemetry_print(void)
 {
+    const spatial_features_t *features = SpatialFeatures_Get();
+
     switch (uart_output_mode)
     {
         case 0:
@@ -44,6 +50,23 @@ void uart_telemetry_print(void)
             // printf("%.3f,%.2f\r\n",
             //        (float)(imu660rc_gyro_z - gyro_offset_z) / imu660rc_transition_factor[1],
             //        euler.yaw);
+            break;
+
+        case 4:
+            printf("%u,%u,", Element_GetRouteIndex(), Element_GetCurrent());
+            printf("%u,%u,%u,", Seesaw_GetState(), Cylinder_GetState(),
+                   Wall_GetState());
+            printf("%.3f,%.3f,", features->ay_g, features->az_g);
+            printf("%.2f\r\n", features->climb_angle_deg);
+            break;
+
+        case 5:
+            printf("%u,%u,%u,%u,", ad_ave[0], ad_ave[1],
+                   ad_ave[3], ad_ave[4]);
+            printf("%.2f,%u,%u,", euler.pitch,
+                   Cylinder_EntryIsDetected(), Cylinder_IsOnSurface());
+            printf("%u,%u,%u\r\n", Cylinder_HasExited(), pwm_fan,
+                   suction_fan_pwm_cylinder);
             break;
         default:
             uart_output_mode = 0;
