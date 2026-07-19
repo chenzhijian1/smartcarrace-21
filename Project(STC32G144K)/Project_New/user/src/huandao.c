@@ -3,7 +3,6 @@
 #include "car_control.h"
 #include "my_motor.h"
 #include "inductance.h"
-#include "element.h"
 #include "quaternion.h"
 #include "navigation.h"
 
@@ -11,6 +10,7 @@
 #define HUANDAO_INSIDE_ANGLE 280.0f
 #define HUANDAO_EXIT_DISTANCE 250.0f
 #define HUANDAO_ENTRY_BIAS_RATIO 0.60f
+#define HUANDAO_DETECT_CONFIRM_COUNT (3U)
 
 /*============================================================================
  * 模块说明：环岛控制模块
@@ -41,6 +41,131 @@ uint8 flag_huandao = 0;         // 0:左环岛, 1:右环岛
 static uint8 huandao_angle_set = 0;
 static float huandao_enter_start_yaw = 0.0f;
 static float huandao_inside_start_yaw = 0.0f;
+
+volatile uint8 huandao_detect_state = HUANDAO_DETECT_NORMAL;
+float huandao_pre_h_threshold = 33.0f;
+float huandao_confirm_h_threshold = 55.0f;
+float huandao_suspect_max_distance = 350.0f;
+float huandao_rearm_h_threshold = 30.0f;
+
+static uint8 huandao_pre_count = 0;
+static uint8 huandao_left_count = 0;
+static uint8 huandao_right_count = 0;
+static uint8 huandao_rearm_count = 0;
+static float huandao_detect_entry_encoder = 0.0f;
+static uint8 huandao_exit_event = 0;
+
+static void huandao_detect_reset_counters(void)
+{
+    huandao_pre_count = 0;
+    huandao_left_count = 0;
+    huandao_right_count = 0;
+    huandao_rearm_count = 0;
+}
+
+void Huandao_DetectReset(void)
+{
+    huandao_detect_state = HUANDAO_DETECT_NORMAL;
+    huandao_detect_entry_encoder = 0.0f;
+    huandao_exit_event = 0;
+    huandao_detect_reset_counters();
+}
+
+void Huandao_DetectStartRearm(void)
+{
+    huandao_detect_state = HUANDAO_DETECT_REARM;
+    huandao_detect_reset_counters();
+}
+
+uint8 Huandao_DetectIsStraightHold(void)
+{
+    return (uint8)(huandao_detect_state == HUANDAO_DETECT_SUSPECT);
+}
+
+static void huandao_set_detected_direction(uint8 detected_dir)
+{
+    if (huandao_dir_source[huandao_count] == HUANDAO_DIR_SOURCE_SENSOR)
+        flag_huandao = detected_dir;
+    else
+        flag_huandao = huandao_dir[huandao_count];
+}
+
+uint8 Huandao_DetectUpdate(void)
+{
+    float element_distance;
+    uint8 circle_left;
+    uint8 circle_right;
+
+    if (huandao_detect_state == HUANDAO_DETECT_ACTIVE)
+        return 0;
+
+    if (huandao_detect_state == HUANDAO_DETECT_REARM)
+    {
+        if (flag == 0 && AD_ONE[0] < huandao_rearm_h_threshold &&
+            AD_ONE[4] < huandao_rearm_h_threshold)
+        {
+            if (++huandao_rearm_count >= HUANDAO_DETECT_CONFIRM_COUNT)
+                Huandao_DetectReset();
+        }
+        else
+        {
+            huandao_rearm_count = 0;
+        }
+        return 0;
+    }
+
+    if (huandao_detect_state == HUANDAO_DETECT_NORMAL)
+    {
+        if (flag == 0 && AD_ONE[0] > huandao_pre_h_threshold &&
+            AD_ONE[4] > huandao_pre_h_threshold)
+        {
+            if (++huandao_pre_count >= HUANDAO_DETECT_CONFIRM_COUNT)
+            {
+                huandao_detect_state = HUANDAO_DETECT_SUSPECT;
+                huandao_detect_entry_encoder = encoder_ave;
+                huandao_detect_reset_counters();
+                aaddcc.err_dir = 0.0f;
+                aaddcc.last_err_dir = 0.0f;
+                return 1;
+            }
+        }
+        else
+        {
+            huandao_pre_count = 0;
+        }
+        return 0;
+    }
+
+    element_distance = encoder_ave - huandao_detect_entry_encoder;
+    circle_left = (uint8)(AD_ONE[0] > huandao_confirm_h_threshold);
+    circle_right = (uint8)(AD_ONE[4] > huandao_confirm_h_threshold);
+
+    huandao_left_count = circle_left ? (uint8)(huandao_left_count + 1U) : 0;
+    huandao_right_count = circle_right ? (uint8)(huandao_right_count + 1U) : 0;
+
+    if (huandao_left_count >= HUANDAO_DETECT_CONFIRM_COUNT ||
+        huandao_right_count >= HUANDAO_DETECT_CONFIRM_COUNT)
+    {
+        huandao_set_detected_direction(
+            (uint8)(huandao_left_count >= HUANDAO_DETECT_CONFIRM_COUNT ? 0 : 1));
+        encoder_temp = encoder_ave;
+        huandao_detect_state = HUANDAO_DETECT_ACTIVE;
+        flag = 1;
+        return 1;
+    }
+
+    if (element_distance >= huandao_suspect_max_distance)
+        Huandao_DetectStartRearm();
+
+    return (uint8)(huandao_detect_state == HUANDAO_DETECT_SUSPECT);
+}
+
+uint8 Huandao_ConsumeExitEvent(void)
+{
+    uint8 event = huandao_exit_event;
+    huandao_exit_event = 0;
+    return event;
+}
 
 /*---------------------------------------------------------------------------
  * 预环岛模式 (flag=1)
@@ -143,7 +268,8 @@ void Huandao_ExitStraight(void) {
     else {
         // 恢复到正常循迹
         flag = 0;
-        element_handler_start_rearm();
+        Huandao_DetectStartRearm();
+        huandao_exit_event = 1;
         Huandao_Reset();
         if (huandao_num > 0) {
             huandao_count = (huandao_count + 1) % huandao_num;

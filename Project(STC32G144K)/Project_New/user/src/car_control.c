@@ -69,7 +69,7 @@ uint16 suction_fan_pwm_start = 6000;
  * 正常循迹模式 (flag=0)
  *---------------------------------------------------------------------------*/
 void CarControl_NormalMode(int16 c_speed, int16 s_speed) {
-    if (element_handler_is_straight()) {
+    if (Huandao_DetectIsStraightHold()) {
         changed_speed = 0;
         normal_speed_cal = normal_speed;
         normal_speed_pre = normal_speed;
