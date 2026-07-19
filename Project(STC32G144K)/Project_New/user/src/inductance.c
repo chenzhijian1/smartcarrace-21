@@ -1,5 +1,5 @@
 #include "inductance.h"
-#include "huandao.h"
+#include "element.h"
 #include "zf_driver_adc.h"
 
 #define EM_ADC_CHANNEL ADC1_CH0_P10
@@ -187,7 +187,7 @@ void direction_adc_get(void)
 
     aaddcc.last_err_dir = aaddcc.err_dir;
 
-    if (Huandao_DetectUpdate())
+    if (Element_AdcUpdate())
     {
         aaddcc.err_dir = 0.0f;
         aaddcc.last_err_dir = 0.0f;

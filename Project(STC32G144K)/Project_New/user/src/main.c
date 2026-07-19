@@ -1,4 +1,5 @@
 #include "headfile.h"
+#include "element.h"
 
 uint8 send_flag = 1;
 uint8 uart_output_mode = 0;
@@ -52,6 +53,8 @@ void uart_telemetry_print(void)
 
 void main(void)
 {
+    static imu_sample_t imu_sample;
+
     clock_init(SYSTEM_CLOCK_96M);
     debug_init();
     interrupt_global_enable();
@@ -84,6 +87,7 @@ void main(void)
     }
     system_delay_ms(1000);
     Gyro_Calibration(400);
+    Element_Init();
 
     // Config_Init();
     // Huandao_Init();
@@ -116,6 +120,8 @@ void main(void)
                 ticks = 1;
             }
             IMU_Update_Dt(0.005f * ticks);
+            IMU_SampleCopy(&imu_sample);
+            Element_ImuUpdate(&imu_sample);
         }
 
         if (flag_adc)
