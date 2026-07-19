@@ -22,6 +22,15 @@
  * 四元数结构体
  *---------------------------------------------------------------------------*/
 typedef struct {
+    float ax_g;
+    float ay_g;
+    float az_g;
+    float gx_dps;
+    float gy_dps;
+    float gz_dps;
+} imu_sample_t;
+
+typedef struct {
     float q0;  // w
     float q1;  // x
     float q2;  // y
@@ -68,6 +77,9 @@ void IMU_Update(void);
 void IMU_Update_Dt(float dt);
 
 // 航向角复�?
+void IMU_SampleCopy(imu_sample_t *sample);
+float IMU_GetGyroZDps(void);
+
 void Yaw_Reset(void);
 
 #endif /* __QUATERNION_H */

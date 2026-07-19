@@ -22,6 +22,9 @@ static float mahony_integral_x = 0.0f;
 static float mahony_integral_y = 0.0f;
 static float mahony_integral_z = 0.0f;
 
+static volatile imu_sample_t imu_sample_buffers[2];
+static volatile uint8 imu_sample_active_index = 0;
+
 /*---------------------------------------------------------------------------
  * 快速平方根倒数算法
  *---------------------------------------------------------------------------*/
@@ -61,6 +64,23 @@ static float Attitude_Atan2(float y, float x) {
 /*---------------------------------------------------------------------------
  * 四元数初始化
  *---------------------------------------------------------------------------*/
+void IMU_SampleCopy(imu_sample_t *sample) {
+    uint8 index;
+
+    if (sample == (imu_sample_t *)0) return;
+    index = imu_sample_active_index;
+    sample->ax_g = imu_sample_buffers[index].ax_g;
+    sample->ay_g = imu_sample_buffers[index].ay_g;
+    sample->az_g = imu_sample_buffers[index].az_g;
+    sample->gx_dps = imu_sample_buffers[index].gx_dps;
+    sample->gy_dps = imu_sample_buffers[index].gy_dps;
+    sample->gz_dps = imu_sample_buffers[index].gz_dps;
+}
+
+float IMU_GetGyroZDps(void) {
+    return imu_sample_buffers[imu_sample_active_index].gz_dps;
+}
+
 void Quaternion_Init(void) {
     q.q0 = 1.0f;
     q.q1 = 0.0f;
@@ -74,6 +94,7 @@ void Quaternion_Init(void) {
     mahony_integral_x = 0.0f;
     mahony_integral_y = 0.0f;
     mahony_integral_z = 0.0f;
+    imu_sample_active_index = 0;
 }
 
 /*---------------------------------------------------------------------------
@@ -220,20 +241,28 @@ void Quaternion_ToEuler(void) {
 void IMU_Update_Dt(float dt) {
     float gx, gy, gz;
     float ax, ay, az;
+    float sensor_gx, sensor_gy, sensor_gz;
+    float sensor_ax, sensor_ay, sensor_az;
+    uint8 write_index;
 
     imu660rc_get_acc();
     imu660rc_get_gyro();
 
     // Sensor axes on the car: +X left, +Y rear, +Z up.
     // Quaternion body axes: +X forward, +Y left, +Z up.
-    gx = -(float)(imu660rc_gyro_y - gyro_offset_y) / imu660rc_transition_factor[1];
-    gy = (float)(imu660rc_gyro_x - gyro_offset_x) / imu660rc_transition_factor[1];
-    gz = (float)(imu660rc_gyro_z - gyro_offset_z) / imu660rc_transition_factor[1];
+    sensor_gx = (float)(imu660rc_gyro_x - gyro_offset_x) / imu660rc_transition_factor[1];
+    sensor_gy = (float)(imu660rc_gyro_y - gyro_offset_y) / imu660rc_transition_factor[1];
+    sensor_gz = (float)(imu660rc_gyro_z - gyro_offset_z) / imu660rc_transition_factor[1];
+    sensor_ax = imu660rc_acc_transition(imu660rc_acc_x);
+    sensor_ay = imu660rc_acc_transition(imu660rc_acc_y);
+    sensor_az = imu660rc_acc_transition(imu660rc_acc_z);
 
-    // The IMU660RC reports about +1 g on Z when the car is level.
-    ax = -imu660rc_acc_transition(imu660rc_acc_y);
-    ay = imu660rc_acc_transition(imu660rc_acc_x);
-    az = imu660rc_acc_transition(imu660rc_acc_z);
+    gx = -sensor_gy;
+    gy = sensor_gx;
+    gz = sensor_gz;
+    ax = -sensor_ay;
+    ay = sensor_ax;
+    az = sensor_az;
 
     if (gx > -0.28f && gx < 0.28f) gx = 0.0f;
     if (gy > -0.28f && gy < 0.28f) gy = 0.0f;
@@ -246,6 +275,15 @@ void IMU_Update_Dt(float dt) {
 
     // A six-axis IMU has no absolute yaw reference.
     euler.yaw = yaw_gyro_integral;
+
+    write_index = (uint8)(imu_sample_active_index ^ 1U);
+    imu_sample_buffers[write_index].ax_g = sensor_ax;
+    imu_sample_buffers[write_index].ay_g = sensor_ay;
+    imu_sample_buffers[write_index].az_g = sensor_az;
+    imu_sample_buffers[write_index].gx_dps = sensor_gx;
+    imu_sample_buffers[write_index].gy_dps = sensor_gy;
+    imu_sample_buffers[write_index].gz_dps = sensor_gz;
+    imu_sample_active_index = write_index;
 }
 
 void IMU_Update(void) {

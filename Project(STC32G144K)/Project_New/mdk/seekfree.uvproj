@@ -873,6 +873,16 @@
               <FilePath>..\user\inc\quaternion.h</FilePath>
             </File>
             <File>
+              <FileName>spatial_common.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\user\inc\spatial_common.h</FilePath>
+            </File>
+            <File>
+              <FileName>spatial_features.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\user\inc\spatial_features.h</FilePath>
+            </File>
+            <File>
               <FileName>SEEKFREE_IMU963RA.h</FileName>
               <FileType>5</FileType>
               <FilePath>..\user\inc\SEEKFREE_IMU963RA.h</FilePath>
@@ -951,6 +961,16 @@
               <FileName>quaternion.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\user\src\quaternion.c</FilePath>
+            </File>
+            <File>
+              <FileName>spatial_common.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\user\src\spatial_common.c</FilePath>
+            </File>
+            <File>
+              <FileName>spatial_features.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\user\src\spatial_features.c</FilePath>
             </File>
             <File>
               <FileName>ui_menu.c</FileName>
