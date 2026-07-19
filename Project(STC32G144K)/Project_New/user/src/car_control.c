@@ -86,12 +86,14 @@ void CarControl_NormalMode(int16 c_speed, int16 s_speed) {
 
     normal_speed_pre = normal_speed;
     test_speed = (int16)normal_speed_cal;
+    Element_PrepareControl(normal_speed, &test_speed, &changed_speed);
 
     // if (flag_key_fast == 1) {
     //     speed_adjust(120, 600);
     // }
     // else {
         speed_adjust(c_speed, s_speed);
+        Element_ClampWheelTargets(test_speed, &set_leftspeed, &set_rightspeed);
     // }
 }
 
@@ -166,9 +168,9 @@ void CarControl_Update(void) {
         // 使用四元数解算的角速度数据（已在IMU_Update中处理）
         // 从IMU963读取的陀螺仪原始数据并转�?
         // IMU963RA陀螺仪±2000dps量程，灵敏度70 mdps/LSB = 0.07 dps/LSB
-        if (imu660rc_gyro_z <= 4 && imu660rc_gyro_z >= -4)
-            imu660rc_gyro_z = 0;
-        gyro_z = (float)(imu660rc_gyro_z - gyro_offset_z) / imu660rc_transition_factor[1];
+        gyro_z = IMU_GetGyroZDps();
+        if (gyro_z > -0.2f && gyro_z < 0.2f)
+            gyro_z = 0.0f;
 
         switch (flag) {
             case 0:  // 正常模式

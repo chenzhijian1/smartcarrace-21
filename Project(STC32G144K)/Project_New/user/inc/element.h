@@ -17,9 +17,17 @@ void Element_Init(void);
 void Element_ImuUpdate(const imu_sample_t *sample);
 uint8 Element_AdcUpdate(void);
 uint8 Element_IsStraightHold(void);
+void Element_PrepareControl(int16 straight_speed,
+                            int16 *target_speed,
+                            int16 *direction_diff);
+void Element_ClampWheelTargets(int16 center_speed,
+                               int16 *left_speed,
+                               int16 *right_speed);
 
 element_type_t Element_GetCurrent(void);
 uint8 Element_GetRouteIndex(void);
 uint8 Element_GetRouteCount(void);
+
+extern uint16 suction_fan_pwm_cylinder;
 
 #endif

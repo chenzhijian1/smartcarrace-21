@@ -1,5 +1,6 @@
 #include "my_peripheral.h"
 #include "car_control.h"
+#include "element.h"
 
 /*============================================================================
  * 妯″潡璇存槑锛氬璁炬帶鍒舵ā鍧?
@@ -151,6 +152,12 @@ static uint8 uart_command_apply(char *cmd)
         case 'u':                           // u+数值: 修改负压风扇启动目标 PWM，占空比范围 0~10000
             suction_fan_pwm_start = (uint16)motor_pwm_limit((int)value);
             printf("fan_start,%d\r\n", suction_fan_pwm_start);
+            uart_feedback_hold_start();
+            return 1;
+
+        case 'v':
+            suction_fan_pwm_cylinder = (uint16)motor_pwm_limit((int)value);
+            printf("fan_cylinder,%d\r\n", suction_fan_pwm_cylinder);
             uart_feedback_hold_start();
             return 1;
 
