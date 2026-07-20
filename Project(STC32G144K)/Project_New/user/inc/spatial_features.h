@@ -58,4 +58,22 @@ void SpatialFeatures_Update(const imu_sample_t *sample);//每个新IMU样本调�
 const spatial_features_t *SpatialFeatures_Get(void);//返回只读快照；指针保持有效到下一次Update()。
 void SpatialFeatures_Reset(void);//清除低通启动状态、滞回状态和所有输出字段。
 
+float spatial_absf(float value);
+int16 spatial_clamp_i16(int16 value, int16 low, int16 high);
+float spatial_accel_norm_g(float ax_g, float ay_g, float az_g);
+uint8 spatial_accel_norm_in_range(float norm_g,
+                                  float min_g,
+                                  float max_g);
+uint8 spatial_accel_vector_norm_in_range(float ax_g,
+                                         float ay_g,
+                                         float az_g,
+                                         float min_g,
+                                         float max_g);
+uint8 spatial_confirm_update(uint8 condition,
+                             uint16 required_samples,
+                             uint16 *count);
+float spatial_lowpass_update(float previous,
+                             float input,
+                             float alpha);
+
 #endif /* __SPATIAL_FEATURES_H_ */

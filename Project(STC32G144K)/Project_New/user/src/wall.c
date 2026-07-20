@@ -1,5 +1,4 @@
 #include "wall.h"
-#include "spatial_common.h"
 
 static volatile uint8 wall_state = WALL_STATE_IDLE;
 static uint16 wall_baseline_count = 0;

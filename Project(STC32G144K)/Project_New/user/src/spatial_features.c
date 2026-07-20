@@ -35,8 +35,85 @@
  */
 
 #include "spatial_features.h"
-#include "spatial_common.h"
 #include <math.h>
+
+float spatial_absf(float value)
+{
+    return value >= 0.0f ? value : -value;
+}
+
+int16 spatial_clamp_i16(int16 value, int16 low, int16 high)
+{
+    if (value < low)
+        return low;
+    if (value > high)
+        return high;
+    return value;
+}
+
+float spatial_accel_norm_g(float ax_g, float ay_g, float az_g)
+{
+    return (float)sqrt(ax_g * ax_g + ay_g * ay_g + az_g * az_g);
+}
+
+uint8 spatial_accel_norm_in_range(float norm_g,
+                                  float min_g,
+                                  float max_g)
+{
+    return (uint8)(norm_g >= min_g && norm_g <= max_g);
+}
+
+uint8 spatial_accel_vector_norm_in_range(float ax_g,
+                                         float ay_g,
+                                         float az_g,
+                                         float min_g,
+                                         float max_g)
+{
+    float norm_squared;
+    float min_squared;
+    float max_squared;
+
+    norm_squared = ax_g * ax_g + ay_g * ay_g + az_g * az_g;
+    min_squared = min_g * min_g;
+    max_squared = max_g * max_g;
+
+    return (uint8)(norm_squared >= min_squared &&
+                   norm_squared <= max_squared);
+}
+
+uint8 spatial_confirm_update(uint8 condition,
+                             uint16 required_samples,
+                             uint16 *count)
+{
+    if (required_samples == 0U)
+    {
+        *count = 0;
+        return 1;
+    }
+
+    if (!condition)
+    {
+        *count = 0;
+        return 0;
+    }
+
+    if (*count < required_samples)
+        (*count)++;
+
+    return (uint8)(*count >= required_samples);
+}
+
+float spatial_lowpass_update(float previous,
+                             float input,
+                             float alpha)
+{
+    if (alpha <= 0.0f)
+        return previous;
+    if (alpha >= 1.0f)
+        return input;
+
+    return previous + alpha * (input - previous);
+}
 
 /* 立体元素公共特征实现：只发布观测量，不决定当前是哪一种元素。*/
 #define SPATIAL_FEATURES_RAD_TO_DEG (57.2957795f) // 弧度转角度的固定比例。
@@ -47,12 +124,6 @@ static uint8 spatial_features_initialized = 0;   // 低通滤波器是否已用�
 static uint8 spatial_features_flat_state = 0;     // 平面姿态滞回内部状态
 static uint8 spatial_features_vertical_state = 0; // 近竖直姿态滞回内部状态
 static uint8 spatial_features_inverted_state = 0; // 倒置姿态滞回内部状态
-
-/* 浮点绝对值工具，供各姿态阈值比较使用。*/
-static float spatial_features_absf(float value)
-{
-    return value >= 0.0f ? value : -value;
-}
 
 /* 清除特征快照、低通启动标志和三个带滞回的姿态状态。*/
 void SpatialFeatures_Reset(void)
@@ -101,7 +172,7 @@ void SpatialFeatures_Update(const imu_sample_t *sample)
     spatial_features.norm_g = spatial_accel_norm_g(
         sample->ax_g, sample->ay_g, sample->az_g);
     spatial_features.gx_dps = sample->gx_dps;
-    spatial_features.gx_abs_dps = spatial_features_absf(sample->gx_dps);
+    spatial_features.gx_abs_dps = spatial_absf(sample->gx_dps);
 
     /* 阶段2：一阶低通滤波(alpha=0.20)
      * 首次调用直接用原始值初始化，避免从0缓慢爬升；
@@ -145,13 +216,13 @@ void SpatialFeatures_Update(const imu_sample_t *sample)
     if (spatial_features_flat_state)
     {
         if (!spatial_features.norm_valid ||
-            spatial_features_absf(spatial_features.ay_lowpass_g) >
+            spatial_absf(spatial_features.ay_lowpass_g) >
                 SPATIAL_FEATURES_FLAT_AY_EXIT_G ||
             spatial_features.az_lowpass_g < SPATIAL_FEATURES_FLAT_AZ_EXIT_G)
             spatial_features_flat_state = 0;
     }
     else if (spatial_features.norm_valid &&
-             spatial_features_absf(spatial_features.ay_lowpass_g) <=
+             spatial_absf(spatial_features.ay_lowpass_g) <=
                  SPATIAL_FEATURES_FLAT_AY_MAX_G &&
              spatial_features.az_lowpass_g >= SPATIAL_FEATURES_FLAT_AZ_MIN_G)
     {
@@ -163,14 +234,14 @@ void SpatialFeatures_Update(const imu_sample_t *sample)
         if (!spatial_features.norm_valid ||
             spatial_features.ay_lowpass_g >
                 SPATIAL_FEATURES_VERTICAL_AY_EXIT_G ||
-            spatial_features_absf(spatial_features.az_lowpass_g) >
+            spatial_absf(spatial_features.az_lowpass_g) >
                 SPATIAL_FEATURES_VERTICAL_AZ_EXIT_G)
             spatial_features_vertical_state = 0;
     }
     else if (spatial_features.norm_valid &&
              spatial_features.ay_lowpass_g <=
                  SPATIAL_FEATURES_VERTICAL_AY_MAX_G &&
-             spatial_features_absf(spatial_features.az_lowpass_g) <=
+             spatial_absf(spatial_features.az_lowpass_g) <=
                  SPATIAL_FEATURES_VERTICAL_AZ_MAX_G)
     {
         spatial_features_vertical_state = 1;
@@ -200,8 +271,8 @@ void SpatialFeatures_Update(const imu_sample_t *sample)
      * 当 ay、az 都接近 0 时(如自由落体)直接返回0度避免除零异常。*/
     ay_for_angle = spatial_features.ay_lowpass_g;
     az_for_angle = spatial_features.az_lowpass_g;
-    if (spatial_features_absf(ay_for_angle) < 0.0001f &&
-        spatial_features_absf(az_for_angle) < 0.0001f)
+    if (spatial_absf(ay_for_angle) < 0.0001f &&
+        spatial_absf(az_for_angle) < 0.0001f)
     {
         spatial_features.climb_angle_deg = 0.0f;
     }

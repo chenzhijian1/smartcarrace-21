@@ -1,6 +1,6 @@
 #include "cylinder.h"
 #include "inductance.h"
-#include "spatial_common.h"
+#include "spatial_features.h"
 
 /* 入口由新ADC帧累计确认，达到阈值后进入PRE_ENTRY。 */
 static uint16 cylinder_detect_count = 0;
