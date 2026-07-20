@@ -4,6 +4,7 @@
 #include "my_motor.h"
 #include "inductance.h"
 #include "element.h"
+#include "cylinder.h"
 #include "navigation.h"
 #include "quaternion.h"
 #include "zf_device_imu660rc.h"
@@ -52,6 +53,10 @@ uint8 cnt_stop = 0;
 uint16 cnt_launch = 0;
 static volatile int16 soft_stop_start_speed = 0;
 static uint8 launch_ready = 1;
+static uint8 cylinder_left_saturation_count = 0;
+static uint8 cylinder_right_saturation_count = 0;
+static uint8 cylinder_left_diff_protected = 0;
+static uint8 cylinder_right_diff_protected = 0;
 
 /*---------------------------------------------------------------------------
  * 风扇控制
@@ -64,6 +69,60 @@ static uint8 flag_suction_fan_off_iap = 0;
 #define error_turn 17.0f
 uint16 suction_fan_pwm_start = 6000;
 #define LAUNCH_FAN_DELAY_TICKS   400
+
+static int16 car_control_protect_cylinder_diff(int16 direction_diff)
+{
+    if (Element_GetCurrent() != ELEMENT_CYLINDER ||
+        !Cylinder_IsOnSurface())
+    {
+        cylinder_left_saturation_count = 0;
+        cylinder_right_saturation_count = 0;
+        cylinder_left_diff_protected = 0;
+        cylinder_right_diff_protected = 0;
+        return direction_diff;
+    }
+
+    if (!cylinder_left_diff_protected && direction_diff < 0 &&
+        motor_left.duty1 >= CYLINDER_SATURATION_PWM_THRESHOLD &&
+        motor_left.err > CYLINDER_SATURATION_ERROR_THRESHOLD)
+    {
+        if (cylinder_left_saturation_count <
+            CYLINDER_SATURATION_CONFIRM_TICKS)
+            cylinder_left_saturation_count++;
+        if (cylinder_left_saturation_count >=
+            CYLINDER_SATURATION_CONFIRM_TICKS)
+            cylinder_left_diff_protected = 1;
+    }
+    else if (!cylinder_left_diff_protected)
+    {
+        cylinder_left_saturation_count = 0;
+    }
+
+    if (!cylinder_right_diff_protected && direction_diff > 0 &&
+        motor_right.duty1 >= CYLINDER_SATURATION_PWM_THRESHOLD &&
+        motor_right.err > CYLINDER_SATURATION_ERROR_THRESHOLD)
+    {
+        if (cylinder_right_saturation_count <
+            CYLINDER_SATURATION_CONFIRM_TICKS)
+            cylinder_right_saturation_count++;
+        if (cylinder_right_saturation_count >=
+            CYLINDER_SATURATION_CONFIRM_TICKS)
+            cylinder_right_diff_protected = 1;
+    }
+    else if (!cylinder_right_diff_protected)
+    {
+        cylinder_right_saturation_count = 0;
+    }
+
+    if ((cylinder_left_diff_protected && direction_diff < 0) ||
+        (cylinder_right_diff_protected && direction_diff > 0))
+    {
+        direction_diff = (int16)((int32)direction_diff *
+            CYLINDER_SATURATION_DIFF_PERCENT / 100L);
+    }
+
+    return direction_diff;
+}
 
 /*---------------------------------------------------------------------------
  * 正常循迹模式 (flag=0)
@@ -234,6 +293,7 @@ void dir_pid(float error, float last_error, float gyro) {
     output = p_out + d_out;
 
     changed_speed = output;
+    changed_speed = car_control_protect_cylinder_diff(changed_speed);
 }
 
 /*---------------------------------------------------------------------------

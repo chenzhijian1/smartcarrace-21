@@ -27,6 +27,48 @@ static uint16 element_cylinder_fan_applied_pwm = 0;
 
 uint16 suction_fan_pwm_cylinder = 10000;
 
+static uint8 element_feedforward_is_allowed(void)
+{
+    if (voltage_battery_is_low() || flag == 4)
+        return 0;
+
+    if (normal_speed == 0 && flag != 5)
+        return 0;
+
+    return 1;
+}
+
+static void element_update_gravity_feedforward(void)
+{
+    float pitch_sin;
+    int16 feedforward_pwm;
+
+    if (!element_feedforward_is_allowed())
+    {
+        motor_set_feedforward_pwm(0);
+        return;
+    }
+
+    pitch_sin = 2.0f * (q.q0 * q.q2 - q.q3 * q.q1);
+    feedforward_pwm = 0;
+
+    switch ((element_type_t)element_current_type)
+    {
+        case ELEMENT_CYLINDER:
+            Cylinder_UpdateGravityFeedforward(pitch_sin);
+            feedforward_pwm = Cylinder_GetGravityFeedforwardPwm();
+            break;
+        case ELEMENT_WALL:
+            Wall_UpdateGravityFeedforward(pitch_sin);
+            feedforward_pwm = Wall_GetGravityFeedforwardPwm();
+            break;
+        default:
+            break;
+    }
+
+    motor_set_feedforward_pwm(feedforward_pwm);
+}
+
 static void element_update_cylinder_fan(uint8 on_surface)
 {
     if (on_surface && !element_cylinder_fan_boosted)
@@ -58,6 +100,7 @@ static void element_update_cylinder_fan(uint8 on_surface)
 
 static void element_reset_type(element_type_t type)
 {
+    motor_set_feedforward_pwm(0);
     SpatialFeatures_Reset();
 
     switch (type)
@@ -85,6 +128,8 @@ static void element_complete(element_type_t completed_type)
     if ((element_type_t)element_current_type != completed_type)
         return;
 
+    motor_set_feedforward_pwm(0);
+
     if ((uint8)(element_route_index + 1U) >= ELEMENT_ROUTE_COUNT)
     {
         element_route_index = ELEMENT_ROUTE_COUNT;
@@ -109,6 +154,7 @@ void Element_Init(void)
     element_current_type = (uint8)element_route[0];
     element_cylinder_fan_boosted = 0;
     element_cylinder_fan_applied_pwm = 0;
+    motor_set_feedforward_pwm(0);
     element_reset_type((element_type_t)element_current_type);
 }
 
@@ -155,6 +201,8 @@ void Element_ImuUpdate(const imu_sample_t *sample)
         default:
             break;
     }
+
+    element_update_gravity_feedforward();
 }
 
 uint8 Element_AdcUpdate(void)

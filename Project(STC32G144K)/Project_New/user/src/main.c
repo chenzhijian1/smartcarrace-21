@@ -65,8 +65,9 @@ void uart_telemetry_print(void)
                    ad_ave[3], ad_ave[4]);
             printf("%.2f,%u,%u,", euler.pitch,
                    Cylinder_EntryIsDetected(), Cylinder_IsOnSurface());
-            printf("%u,%u,%u\r\n", Cylinder_HasExited(), pwm_fan,
+            printf("%u,%u,%u,", Cylinder_HasExited(), pwm_fan,
                    suction_fan_pwm_cylinder);
+            printf("%d\r\n", motor_get_feedforward_pwm());
             break;
         default:
             uart_output_mode = 0;
