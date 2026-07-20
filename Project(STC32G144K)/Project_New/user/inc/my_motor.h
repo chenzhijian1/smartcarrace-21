@@ -96,6 +96,8 @@ void motor_right_brake(void);
 
 int16 motor_closed_loop_control(motor_struct *sptr);
 void motor_control(int16 speed_l, int16 speed_r);
+void motor_set_feedforward_pwm(int16 pwm);
+int16 motor_get_feedforward_pwm(void);
 void motor_control_stop(void);
 
 void suction_fan_init(void);

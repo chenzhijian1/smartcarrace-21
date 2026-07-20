@@ -24,7 +24,7 @@ static uint8 uart_cmd_buf[50];
 static uint8 uart_cmd_rx_data[16];
 static uint8 uart_cmd_index = 0;
 volatile uint16 uart_feedback_hold_ticks = 0;
-extern uint8 send_flag;
+extern volatile uint8 send_flag;
 
 static void uart_feedback_hold_start(void)
 {

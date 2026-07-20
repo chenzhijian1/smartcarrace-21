@@ -5,7 +5,7 @@
 #include "cylinder.h"
 #include "wall.h"
 
-uint8 send_flag = 1;
+volatile uint8 send_flag = 1;
 uint8 uart_output_mode = 0;
 
 void uart_telemetry_print(void)

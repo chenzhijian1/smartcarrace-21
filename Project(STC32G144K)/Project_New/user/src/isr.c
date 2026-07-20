@@ -3,7 +3,7 @@
 
 #define LED P52
 
-extern uint8 send_flag;
+extern volatile uint8 send_flag;
 uint8 cnt_send = 0;
 
 static uint8 adc_tick = 0;
