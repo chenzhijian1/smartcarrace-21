@@ -34,8 +34,8 @@
  *
  * ## 坐标系约定
  * - ax/ay/az 单位为 g，gx 单位为度/秒
- * - climb_angle_deg = atan2(-ay_lowpass, az_lowpass)，正角表示车头上仰
- * - 跷跷板的入口、峰值和回落判断统一使用climb_angle_deg，单位为度
+ * - pitch直接由姿态解算传入；实车抬起时为负，下降时为正
+ * - 跷跷板入口、抬起峰值和下降判断统一使用pitch，单位为度
  * - 所有 *_SAMPLES 表示去重后的有效 IMU 帧数（约 5ms/帧）
  */
 
@@ -63,35 +63,13 @@ static uint16 seesaw_reverse_count = 0; // gx 反向连续确认帧计数
  * ========================================================================== */
 
 /**
- * @brief  将整数限制在闭区间 [low, high] 内。
- * @param  value  待限制的值。
- * @param  low    下限。
- * @param  high   上限。
- * @return 限制后的值。
- * @note   仅被轮速安全限制函数 Seesaw_ClampWheelTargets() 使用，
- *          不改变状态机。
+ * @brief  从实车pitch提取抬起角度幅值。
+ * @param  pitch_deg  姿态解算俯仰角；抬起为负，下降为正。
+ * @return 抬起角度幅值，单位度；下降或平坦时返回0。
  */
-static int16 seesaw_clamp_i16(int16 value, int16 low, int16 high)
+static float seesaw_rising_tilt_deg(float pitch_deg)
 {
-    if (value < low)
-        return low;
-    if (value > high)
-        return high;
-    return value;
-}
-
-/**
- * @brief  提取正向上坡角度（仅保留正值）。
- * @param  features  IMU 特征快照指针。
- * @return 正向上坡倾角，单位度；下坡或平坦时返回0。
- * @note   跷跷板识别只关心上坡方向，下坡负角按 0 处理，简化后续阈值比较。
- *          角度来自SpatialFeatures中对低通ay、az执行的atan2计算。
- */
-static float seesaw_positive_tilt_deg(const spatial_features_t *features)
-{
-    float tilt_deg = features->climb_angle_deg;
-
-    return tilt_deg > 0.0f ? tilt_deg : 0.0f;
+    return pitch_deg < 0.0f ? -pitch_deg : 0.0f;
 }
 
 /**
@@ -200,9 +178,9 @@ static void seesaw_update_motion_sign(const spatial_features_t *features)
  * ## 状态机说明
  *
  * ### IDLE（空闲）
- * 等待平面基线建立，然后检测上坡倾角候选：
+ * 等待平面基线建立，然后检测负pitch抬起候选：
  * 1. 连续 flat 帧建立平面基线（seesaw_baseline_seen = 1）。
- * 2. 基线建立后，检测 ay/az/norm 条件是否满足上坡候选。
+ * 2. 基线建立后，检测pitch/az/norm条件是否满足抬起候选。
  * 3. 连续满足 SEESAW_ENTER_CONFIRM_SAMPLES 帧后进入 RISING。
  *
  * ### RISING / FALLING / ACTIVE（登板后）
@@ -215,11 +193,11 @@ static void seesaw_update_motion_sign(const spatial_features_t *features)
  * RISING 阶段：
  * - 跟踪峰值倾角seesaw_peak_tilt_deg
  * - 检测峰值是否达到最小有效值SEESAW_TILT_MIN_PEAK_DEG
- * - 检测倾角下降趋势（tilt_deg <= peak - SEESAW_TILT_DROP_DEG）
- * - 满足峰值+趋势+反向证据后进入 FALLING
+ * - 检测pitch是否由负转正并连续达到+3度
+ * - 满足负峰值和正pitch趋势后进入FALLING
  *
  * FALLING 阶段：
- * - 下降趋势连续确认后进入 ACTIVE
+ * - 正pitch继续连续确认后进入ACTIVE
  *
  * ACTIVE 阶段：
  * - 连续 flat 帧确认后进入 EXITED
@@ -231,9 +209,9 @@ static void seesaw_update_motion_sign(const spatial_features_t *features)
  *          速度限制由 Seesaw_GetSpeedTarget() 和 Seesaw_ClampWheelTargets()
  *          在 TIM4 中断中根据状态机状态独立执行。
  */
-uint8 Seesaw_ImuUpdate(const spatial_features_t *features)
+uint8 Seesaw_ImuUpdate(const spatial_features_t *features, float pitch_deg)
 {
-    float tilt_deg;      /* 正向上坡倾角，单位度 */
+    float tilt_deg;      /* 负pitch对应的抬起角度幅值，单位度 */
     uint8 tilt_valid;    /* 上坡条件是否满足 */
     uint8 trend_valid;   /* 下降趋势是否满足 */
 
@@ -276,9 +254,9 @@ uint8 Seesaw_ImuUpdate(const spatial_features_t *features)
          * - 平面基线已建立
          * - 加速度模长有效（norm_valid）
          * - Z 轴加速度不低于最低阈值（排除倒置姿态）
-         * - 上坡角度在[SEESAW_TILT_ENTER_DEG, SEESAW_TILT_MAX_DEG]范围内
+         * - pitch在[-SEESAW_TILT_MAX_DEG, -SEESAW_TILT_ENTER_DEG]范围内
          */
-        tilt_deg = seesaw_positive_tilt_deg(features);
+        tilt_deg = seesaw_rising_tilt_deg(pitch_deg);
         tilt_valid = (uint8)(
             seesaw_baseline_seen &&
             features->norm_valid &&
@@ -348,9 +326,10 @@ uint8 Seesaw_ImuUpdate(const spatial_features_t *features)
     }
     seesaw_norm_invalid_count = 0;  /* 模长恢复正常，清零计数器 */
 
-    /* 倾角过大或 Z 轴过低 → 可能进入圆筒/墙面等其他立体元素，撤销候选 */
-    tilt_deg = seesaw_positive_tilt_deg(features);
-    if (tilt_deg > SEESAW_TILT_MAX_DEG ||
+    /* pitch绝对值过大或Z轴过低时撤销候选。 */
+    tilt_deg = seesaw_rising_tilt_deg(pitch_deg);
+    if (pitch_deg > SEESAW_TILT_MAX_DEG ||
+        pitch_deg < -SEESAW_TILT_MAX_DEG ||
         features->az_lowpass_g < SEESAW_AZ_MIN_G)
     {
         seesaw_clear_candidate();
@@ -364,9 +343,8 @@ uint8 Seesaw_ImuUpdate(const spatial_features_t *features)
     if (tilt_deg > seesaw_peak_tilt_deg)
         seesaw_peak_tilt_deg = tilt_deg;
 
-    /* 检测下降趋势：当前角度比峰值低至少SEESAW_TILT_DROP_DEG度。 */
-    trend_valid = (uint8)(
-        tilt_deg <= seesaw_peak_tilt_deg - SEESAW_TILT_DROP_DEG);
+    /* 实车下降时pitch为正；连续达到+3度后确认下降趋势。 */
+    trend_valid = (uint8)(pitch_deg >= SEESAW_TILT_ENTER_DEG);
     if (trend_valid)
     {
         if (spatial_confirm_update(1,
@@ -399,16 +377,13 @@ uint8 Seesaw_ImuUpdate(const spatial_features_t *features)
         /*
          * 进入 FALLING 的条件（同时满足）：
          * 1. 峰值倾角 >= 最小有效峰值
-         * 2. 下降趋势连续确认
-         * 3. 陀螺检测到反向 或 倾角下降幅度达到 2 倍阈值
+         * 2. 正pitch下降趋势连续确认
          */
         if (seesaw_peak_tilt_deg >= SEESAW_TILT_MIN_PEAK_DEG &&
-            seesaw_trend_count >= SEESAW_TREND_CONFIRM_SAMPLES &&
-            (seesaw_reverse_seen ||
-             tilt_deg <= seesaw_peak_tilt_deg -
-                            2.0f * SEESAW_TILT_DROP_DEG))
+            seesaw_trend_count >= SEESAW_TREND_CONFIRM_SAMPLES)
         {
             seesaw_state = SEESAW_STATE_FALLING;
+            seesaw_trend_count = 0;
         }
     }
     /* ==================================================================
@@ -418,7 +393,7 @@ uint8 Seesaw_ImuUpdate(const spatial_features_t *features)
     {
         if (seesaw_trend_count >= SEESAW_TREND_CONFIRM_SAMPLES)
         {
-            /* 有界峰值后持续回落，确认有效跷跷板轨迹 */
+            /* 进入FALLING后正pitch继续成立，确认有效跷跷板轨迹。 */
             seesaw_state = SEESAW_STATE_ACTIVE;
             seesaw_exit_count = 0;  /* 初始化退出计数 */
         }
@@ -602,15 +577,15 @@ void Seesaw_ClampWheelTargets(int16 center_speed,
     {
         low = (int16)low_abs;
         high = (int16)high_abs;
-        *left_speed = seesaw_clamp_i16(*left_speed, low, high);
-        *right_speed = seesaw_clamp_i16(*right_speed, low, high);
+        *left_speed = spatial_clamp_i16(*left_speed, low, high);
+        *right_speed = spatial_clamp_i16(*right_speed, low, high);
     }
     else
     {
         /* 反向时交换上下限 */
         low = (int16)-high_abs;
         high = (int16)-low_abs;
-        *left_speed = seesaw_clamp_i16(*left_speed, low, high);
-        *right_speed = seesaw_clamp_i16(*right_speed, low, high);
+        *left_speed = spatial_clamp_i16(*left_speed, low, high);
+        *right_speed = spatial_clamp_i16(*right_speed, low, high);
     }
 }

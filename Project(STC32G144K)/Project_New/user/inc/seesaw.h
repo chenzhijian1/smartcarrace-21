@@ -18,10 +18,9 @@
 
 /* ---------- 姿态识别阈值 ---------- */
 
-#define SEESAW_TILT_ENTER_DEG             (8.0f)  // 连续达到该上仰角后进入候选。
-#define SEESAW_TILT_MIN_PEAK_DEG          (15.0f) // 有效跷跷板轨迹必须达到的最小峰值角。
-#define SEESAW_TILT_MAX_DEG               (60.0f) // 超过该上仰角时撤销跷跷板候选。
-#define SEESAW_TILT_DROP_DEG              (6.0f)  // 当前角度比峰值下降该角度时确认下降趋势。
+#define SEESAW_TILT_ENTER_DEG             (3.0f)  // 抬起需 pitch<=-3°；下降需 pitch>=+3°。
+#define SEESAW_TILT_MIN_PEAK_DEG          (8.0f)  // 抬起阶段 |-pitch| 至少达到 8°。
+#define SEESAW_TILT_MAX_DEG               (40.0f) // |pitch| 超过 40°时撤销跷跷板候选。
 
 /* 旧版直接使用-ay重力分量的阈值，保留数值供历史调参对照，不再参与识别。 */
 /* #define SEESAW_PITCH_ENTER_G           (0.1392f) */
@@ -36,10 +35,10 @@
 
 /* ---------- 连续帧和超时 ---------- */
 #define SEESAW_BASELINE_CONFIRM_SAMPLES   (5U)//平面起始姿态连续确认帧数。没有基线时不接受倾角候选。
-#define SEESAW_ENTER_CONFIRM_SAMPLES      (5U)//正向上坡倾角连续确认帧数，决定何时进入 RISING。
-#define SEESAW_TREND_CONFIRM_SAMPLES      (3U)//峰值之后持续低于峰值的确认帧数，决定何时允许进入 FALLING。
-#define SEESAW_EXIT_CONFIRM_SAMPLES       (15U)//回到平面连续确认帧数，决定何时进入 EXITED。
-#define SEESAW_MAX_CANDIDATE_SAMPLES      (1200U)//候选最长持续时间：1200 帧约等于 6 秒（按 5 ms/帧估算）。
+#define SEESAW_ENTER_CONFIRM_SAMPLES      (5U)//负 pitch 抬起连续确认帧数，决定何时进入 RISING。
+#define SEESAW_TREND_CONFIRM_SAMPLES      (3U)//正 pitch 下降连续确认帧数，用于确认 FALLING/ACTIVE。
+#define SEESAW_EXIT_CONFIRM_SAMPLES       (3U)//回到平面连续确认帧数，决定何时进入 EXITED。
+#define SEESAW_MAX_CANDIDATE_SAMPLES      (10U)//候选最长持续时间：10 帧约等于 50 ms（按 5 ms/帧估算）。
 #define SEESAW_NORM_INVALID_GRACE_SAMPLES (5U)//加速度模长短暂超出 0.85～1.15 g 时允许保留候选的帧数。
 
 /* ---------- 第二种速度策略 ---------- */
@@ -71,7 +70,7 @@
 
 void Seesaw_Init(void);//上电初始化入口，内部清空本模块全部状态。
 void Seesaw_Reset(void);//重置本模块状态，恢复到 IDLE。
-uint8 Seesaw_ImuUpdate(const spatial_features_t *features);//主循环每收到一个新IMU特征帧调用一次，内部推进状态机；当前状态非IDLE时返回1。
+uint8 Seesaw_ImuUpdate(const spatial_features_t *features, float pitch_deg);//主循环每收到一个新IMU特征帧调用一次；抬起pitch<0，下降pitch>0。
 uint8 Seesaw_IsCandidate(void);//返回当前是否处于 RISING/FALLING 候选阶段。
 uint8 Seesaw_IsConfirmed(void);//返回是否已经完成峰值转折（ACTIVE 或 EXITED），可用于路线确认。
 uint8 Seesaw_HasExited(void);//返回是否已经连续回到平面。

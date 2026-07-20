@@ -13,11 +13,9 @@ static uint8 wall_norm_invalid_count = 0;
 static uint8 wall_lateral_seen = 0;
 static volatile int8 wall_lateral_side = 0;
 
-/* 浮点绝对值工具，供横向和下坡的分量阈值比较使用。 */
-static float wall_absf(float value)
-{
-    return value >= 0.0f ? value : -value;
-}
+/* 主循环写非活动槽，读取方只访问活动槽。 */
+static volatile int16 wall_gravity_ff_pwm[2] = {0, 0};
+static volatile uint8 wall_gravity_ff_active_index = 0;
 
 /* 清除本次候选的计数和横向侧别证据，保留基线由 Wall_Reset() 负责。 */
 static void wall_clear_candidate(void)
@@ -40,6 +38,7 @@ void Wall_Reset(void)
     wall_baseline_count = 0;
     wall_baseline_seen = 0;
     wall_clear_candidate();
+    Wall_UpdateGravityFeedforward(0.0f);
 }
 
 /* 上电初始化包装函数；实际复位工作由 Wall_Reset() 完成。 */
@@ -48,12 +47,44 @@ void Wall_Init(void)
     Wall_Reset();
 }
 
+void Wall_UpdateGravityFeedforward(float pitch_sin)
+{
+    uint8 next_index;
+    float gravity_pwm;
+
+    if (!Wall_IsCandidate())
+    {
+        gravity_pwm = 0.0f;
+    }
+    else
+    {
+        if (pitch_sin > 1.0f)
+            pitch_sin = 1.0f;
+        else if (pitch_sin < -1.0f)
+            pitch_sin = -1.0f;
+
+        gravity_pwm = -WALL_GRAVITY_FF_PWM * pitch_sin;
+    }
+
+    next_index = (uint8)(wall_gravity_ff_active_index ^ 1U);
+    wall_gravity_ff_pwm[next_index] = (int16)gravity_pwm;
+    wall_gravity_ff_active_index = next_index;
+}
+
+int16 Wall_GetGravityFeedforwardPwm(void)
+{
+    uint8 index;
+
+    index = wall_gravity_ff_active_index;
+    return wall_gravity_ff_pwm[index];
+}
+
 /*
  * 主循环每个去重后的 IMU 特征帧调用一次。
  * 依次识别：平面基线 -> 上坡 -> 近竖直 -> 轮轴方向横向 -> 下坡 -> 回平。
  * 只更新状态和控制快照，不直接写电机或风机；返回非零表示候选仍存在。
  */
-uint8 Wall_ImuUpdate(const spatial_features_t *features)
+uint8 Wall_ImuUpdate(const spatial_features_t *features, float pitch_deg)
 {
     uint8 climb_valid;
     uint8 vertical_valid;
@@ -84,12 +115,11 @@ uint8 Wall_ImuUpdate(const spatial_features_t *features)
                 &wall_baseline_count);
         }
 
-        /* 使用低通ay、az经atan2得到的上仰角确认墙面上坡入口。 */
+        /* 与圆筒一致，使用euler.pitch<-5度确认上坡入口。 */
         climb_valid = (uint8)(
             wall_baseline_seen &&
             features->norm_valid &&
-            features->climb_angle_deg >= WALL_CLIMB_ENTER_DEG &&
-            features->az_lowpass_g > WALL_VERTICAL_AZ_MAX_G);
+            pitch_deg < WALL_ENTRY_PITCH_MAX_DEG);
 
         if (spatial_confirm_update(climb_valid,
                                    WALL_CLIMB_CONFIRM_SAMPLES,
@@ -144,13 +174,13 @@ uint8 Wall_ImuUpdate(const spatial_features_t *features)
         features->ay_lowpass_g <= WALL_VERTICAL_AY_MAX_G &&
         features->az_lowpass_g <= WALL_VERTICAL_AZ_MAX_G &&
         features->az_lowpass_g > WALL_INVERTED_AZ_MAX_G &&
-        wall_absf(features->ax_lowpass_g) <= WALL_VERTICAL_AX_MAX_G);
+        spatial_absf(features->ax_lowpass_g) <= WALL_VERTICAL_AX_MAX_G);
 
     lateral_valid = (uint8)(
         features->norm_valid &&
-        wall_absf(features->ax_lowpass_g) >= WALL_LATERAL_AX_MIN_G &&
-        wall_absf(features->ay_lowpass_g) <= WALL_LATERAL_AY_MAX_G &&
-        wall_absf(features->az_lowpass_g) <= WALL_LATERAL_AZ_MAX_G);
+        spatial_absf(features->ax_lowpass_g) >= WALL_LATERAL_AX_MIN_G &&
+        spatial_absf(features->ay_lowpass_g) <= WALL_LATERAL_AY_MAX_G &&
+        spatial_absf(features->az_lowpass_g) <= WALL_LATERAL_AZ_MAX_G);
 
     if (wall_state == WALL_STATE_CLIMB_CANDIDATE)
     {
@@ -199,7 +229,7 @@ uint8 Wall_ImuUpdate(const spatial_features_t *features)
         descent_valid = (uint8)(
             wall_lateral_seen &&
             features->ay_lowpass_g >= WALL_DESCENT_AY_MIN_G &&
-            wall_absf(features->ax_lowpass_g) <= WALL_DESCENT_AX_MAX_G &&
+            spatial_absf(features->ax_lowpass_g) <= WALL_DESCENT_AX_MAX_G &&
             features->az_lowpass_g > WALL_INVERTED_AZ_MAX_G);
 
         if (spatial_confirm_update(descent_valid,
@@ -340,15 +370,6 @@ int16 Wall_GetSpeedTarget(int16 current_speed, int16 straight_speed)
 }
 
 /* 将单个轮速目标限制在闭区间内。 */
-static int16 wall_clamp_i16(int16 value, int16 low, int16 high)
-{
-    if (value < low)
-        return low;
-    if (value > high)
-        return high;
-    return value;
-}
-
 /*
  * TIM4 在 speed_adjust() 后调用，禁止墙面进行中单轮目标反向。
  * 正向范围是 [0, 2*center]，倒车范围是 [-2*abs(center), 0]。
@@ -375,15 +396,15 @@ void Wall_ClampWheelTargets(int16 center_speed,
     {
         low = 0;
         high = (int16)high_abs;
-        *left_speed = wall_clamp_i16(*left_speed, low, high);
-        *right_speed = wall_clamp_i16(*right_speed, low, high);
+        *left_speed = spatial_clamp_i16(*left_speed, low, high);
+        *right_speed = spatial_clamp_i16(*right_speed, low, high);
     }
     else
     {
         low = (int16)-high_abs;
         high = 0;
-        *left_speed = wall_clamp_i16(*left_speed, low, high);
-        *right_speed = wall_clamp_i16(*right_speed, low, high);
+        *left_speed = spatial_clamp_i16(*left_speed, low, high);
+        *right_speed = spatial_clamp_i16(*right_speed, low, high);
     }
 }
 

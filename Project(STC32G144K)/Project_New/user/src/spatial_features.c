@@ -63,24 +63,6 @@ uint8 spatial_accel_norm_in_range(float norm_g,
     return (uint8)(norm_g >= min_g && norm_g <= max_g);
 }
 
-uint8 spatial_accel_vector_norm_in_range(float ax_g,
-                                         float ay_g,
-                                         float az_g,
-                                         float min_g,
-                                         float max_g)
-{
-    float norm_squared;
-    float min_squared;
-    float max_squared;
-
-    norm_squared = ax_g * ax_g + ay_g * ay_g + az_g * az_g;
-    min_squared = min_g * min_g;
-    max_squared = max_g * max_g;
-
-    return (uint8)(norm_squared >= min_squared &&
-                   norm_squared <= max_squared);
-}
-
 uint8 spatial_confirm_update(uint8 condition,
                              uint16 required_samples,
                              uint16 *count)

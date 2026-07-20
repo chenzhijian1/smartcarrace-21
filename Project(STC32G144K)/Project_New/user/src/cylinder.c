@@ -21,10 +21,6 @@ static uint16 cylinder_exit_imu_count = 0;
 static uint8 cylinder_top_seen = 0;
 static uint8 cylinder_return_half_seen = 0;
 
-/* 出口电感只作为辅助：ready=1时把IMU确认帧数由20缩短为10。 */
-static uint16 cylinder_exit_em_count = 0;
-static uint8 cylinder_exit_em_ready = 0;
-
 /* 短赛道测试用自动重布防状态。 */
 static uint16 cylinder_rearm_flat_count = 0;
 static uint16 cylinder_rearm_clear_count = 0;
@@ -34,21 +30,10 @@ static uint16 cylinder_rearm_lockout_count = 0;
 /* 圆筒位置判定使用的粗略运动进度，不属于桶面转向控制器输出。 */
 static float cylinder_rotation_progress_deg = 0.0f; /* |gyro_x|积分，0到360度 */
 
-/* 保留的一次性退出事件接口，供外部按需消费。 */
-static uint8 cylinder_exit_event = 0;
+static volatile int16 cylinder_gravity_ff_pwm[2] = {0, 0};
+static volatile uint8 cylinder_gravity_ff_active_index = 0;
 
-static float cylinder_absf(float value)
-{
-    return value >= 0.0f ? value : -value;
-}
-
-static uint8 cylinder_accel_is_valid(float ax_g, float ay_g, float az_g)
-{
-    return spatial_accel_vector_norm_in_range(
-        ax_g, ay_g, az_g,
-        CYLINDER_IMU_NORM_MIN_G,
-        CYLINDER_IMU_NORM_MAX_G);
-}
+static uint8 cylinder_climb_signal_is_present(float pitch_deg);
 
 /* 当前电感帧是否满足入口候选条件，只判断单帧。 */
 static uint8 cylinder_entry_signal_is_present(void)
@@ -63,7 +48,7 @@ static uint8 cylinder_entry_signal_is_present(void)
 }
 
 #if CYLINDER_TEST_AUTO_REARM_ENABLE
-/* 自动重布防后，入口信号消失8帧或等待200帧即可解锁。 */
+/* 自动重布防后，入口信号消失8帧或等待100帧即可解锁。 */
 static void cylinder_update_entry_lockout(uint8 entry_signal_present)
 {
     (void)spatial_confirm_update((uint8)!entry_signal_present,
@@ -82,46 +67,13 @@ static void cylinder_update_entry_lockout(uint8 entry_signal_present)
 }
 #endif
 
-/* 进入后继续读取电感；后半圈的出口信号只能缩短IMU确认时间。 */
-static void cylinder_update_exit_inductance(void)
-{
-    uint8 exit_signal_present;
-
-    if (Cylinder_HasExited())
-        return;
-
-    if (!cylinder_return_half_seen ||
-        (cylinder_state != CYLINDER_STATE_ON_CYLINDER &&
-         cylinder_state != CYLINDER_STATE_EXIT_STRAIGHT))
-    {
-        cylinder_exit_em_count = 0;
-        cylinder_exit_em_ready = 0;
-        return;
-    }
-
-    exit_signal_present = (uint8)(
-        ad_ave[0] + ad_ave[4] <= CYLINDER_EXIT_OUTER_SUM_MAX &&
-        ad_ave[1] + ad_ave[3] <= CYLINDER_EXIT_LONGITUDINAL_SUM_MAX);
-
-    if (spatial_confirm_update(exit_signal_present,
-                               CYLINDER_EXIT_EM_CONFIRM_SAMPLES,
-                               &cylinder_exit_em_count))
-    {
-        cylinder_exit_em_ready = 1;
-    }
-    else if (!exit_signal_present)
-    {
-        cylinder_exit_em_ready = 0;
-    }
-}
-
 /* 更新陀螺积分、顶部证据、后半圈证据和出口直道阶段。 */
 static void cylinder_update_motion_evidence(float ay_g, float az_g,
                                              float gyro_x_dps)
 {
     float gyro_x_abs;
 
-    gyro_x_abs = cylinder_absf(gyro_x_dps);
+    gyro_x_abs = spatial_absf(gyro_x_dps);
     if (gyro_x_abs > CYLINDER_GYRO_X_DEADBAND_DPS &&
         cylinder_rotation_progress_deg < 360.0f)
     {
@@ -173,17 +125,19 @@ static void cylinder_update_motion_evidence(float ay_g, float az_g,
     }
 }
 
-/* 出口最终必须由pitch和az连续确认。 */
-static void cylinder_update_exit_pose(float pitch_deg, float az_g)
+/* 出口最终必须由gyro_x、pitch和az连续确认。 */
+static void cylinder_update_exit_pose(float gyro_x_dps,
+                                      float pitch_deg, float az_g)
 {
-    uint8 exit_samples_required;
     uint8 exit_pose_present;
 
     exit_pose_present = (uint8)(
         (cylinder_rotation_progress_deg >= CYLINDER_EXIT_PROGRESS_DEG ||
          cylinder_return_half_seen) &&
-        pitch_deg < CYLINDER_EXIT_PITCH_MAX_DEG &&
-        az_g > CYLINDER_EXIT_AZ_MIN_G);
+        spatial_absf(gyro_x_dps) <=
+            CYLINDER_EXIT_GYRO_X_ABS_MAX_DPS &&
+        pitch_deg <= CYLINDER_EXIT_PITCH_MAX_DEG &&
+        az_g >= CYLINDER_EXIT_AZ_MIN_G);
 
     if (!exit_pose_present)
     {
@@ -195,17 +149,12 @@ static void cylinder_update_exit_pose(float pitch_deg, float az_g)
     if (Cylinder_HasExited())
         return;
 
-    exit_samples_required = cylinder_exit_em_ready ?
-        CYLINDER_EXIT_IMU_WITH_EM_SAMPLES :
-        CYLINDER_EXIT_IMU_CONFIRM_SAMPLES;
-
     if (!spatial_confirm_update(1,
-                                exit_samples_required,
+                                CYLINDER_EXIT_IMU_CONFIRM_SAMPLES,
                                 &cylinder_exit_imu_count))
         return;
 
     cylinder_exit_imu_count = CYLINDER_EXIT_CONFIRM_LATCH;
-    cylinder_exit_event = 1;
     cylinder_state = CYLINDER_STATE_EXIT_STRAIGHT;
     cylinder_left_guard_active = 0;
 }
@@ -230,11 +179,6 @@ void Cylinder_Init(void)
 
 uint8 Cylinder_AdcUpdate(void)
 {
-    return Cylinder_AdcCandidateUpdate(1);
-}
-
-uint8 Cylinder_AdcCandidateUpdate(uint8 activate)
-{
     uint8 entry_signal_present;
 
     entry_signal_present = cylinder_entry_signal_is_present();
@@ -248,40 +192,16 @@ uint8 Cylinder_AdcCandidateUpdate(uint8 activate)
 #endif
 
     if (cylinder_state != CYLINDER_STATE_IDLE)
-    {
-        cylinder_update_exit_inductance();
         return 1;
-    }
 
     if (!spatial_confirm_update(entry_signal_present,
                                 CYLINDER_DETECT_CONFIRM_SAMPLES,
                                 &cylinder_detect_count))
         return 0;
 
-    if (activate)
-    {
-        return Cylinder_ActivateCandidate();
-    }
-
-    return 1;
-}
-
-uint8 Cylinder_ActivateCandidate(void)
-{
-    if (cylinder_state != CYLINDER_STATE_IDLE ||
-        cylinder_entry_lockout ||
-        cylinder_detect_count < CYLINDER_DETECT_CONFIRM_SAMPLES)
-        return 0;
-
     cylinder_state = CYLINDER_STATE_PRE_ENTRY;
     cylinder_left_guard_active = 1;
     return 1;
-}
-
-uint8 Cylinder_IsDetected(void)
-{
-    return (uint8)(cylinder_state != CYLINDER_STATE_IDLE &&
-                   !Cylinder_HasExited());
 }
 
 uint8 Cylinder_EntryIsDetected(void)
@@ -300,23 +220,17 @@ uint8 Cylinder_IsOnSurface(void)
  * IMU流程：PRE_ENTRY确认上筒，ON_CYLINDER累计运动证据，
  * EXIT_STRAIGHT继续确认正立出口。返回1表示当前需要筒面负压。
  */
-uint8 Cylinder_ImuUpdate(float ax_g, float ay_g, float az_g,
+uint8 Cylinder_ImuUpdate(float ay_g, float az_g,
                          float gyro_x_dps, float pitch_deg)
 {
-    uint8 norm_valid;
-
     if (cylinder_state == CYLINDER_STATE_IDLE)
         return 0;
 
     if (Cylinder_HasExited())
     {
 #if CYLINDER_TEST_AUTO_REARM_ENABLE
-        norm_valid = cylinder_accel_is_valid(ax_g, ay_g, az_g);
         (void)spatial_confirm_update(
-            (uint8)(norm_valid &&
-                    cylinder_absf(ay_g) <=
-                        CYLINDER_REARM_FLAT_AY_ABS_MAX_G &&
-                    az_g >= CYLINDER_REARM_FLAT_AZ_MIN_G),
+            cylinder_climb_signal_is_present(pitch_deg),
             CYLINDER_REARM_FLAT_CONFIRM_SAMPLES,
             &cylinder_rearm_flat_count);
 
@@ -328,7 +242,7 @@ uint8 Cylinder_ImuUpdate(float ax_g, float ay_g, float az_g,
     if (cylinder_state == CYLINDER_STATE_PRE_ENTRY)
     {
         if (spatial_confirm_update(
-                Cylinder_ClimbSignalIsPresent(pitch_deg),
+                cylinder_climb_signal_is_present(pitch_deg),
                 CYLINDER_CLIMB_CONFIRM_SAMPLES,
                 &cylinder_climb_count))
         {
@@ -340,19 +254,14 @@ uint8 Cylinder_ImuUpdate(float ax_g, float ay_g, float az_g,
     }
 
     cylinder_update_motion_evidence(ay_g, az_g, gyro_x_dps);
-    cylinder_update_exit_pose(pitch_deg, az_g);
+    cylinder_update_exit_pose(gyro_x_dps, pitch_deg, az_g);
 
     return Cylinder_IsOnSurface();
 }
 
-uint8 Cylinder_ClimbSignalIsPresent(float pitch_deg)
+static uint8 cylinder_climb_signal_is_present(float pitch_deg)
 {
     return (uint8)(pitch_deg < CYLINDER_ENTRY_PITCH_MAX_DEG);
-}
-
-uint8 Cylinder_ExitInductanceIsReady(void)
-{
-    return cylinder_exit_em_ready;
 }
 
 uint8 Cylinder_HasExited(void)
@@ -361,28 +270,9 @@ uint8 Cylinder_HasExited(void)
                    CYLINDER_EXIT_CONFIRM_LATCH);
 }
 
-uint8 Cylinder_ConsumeExitEvent(void)
-{
-    uint8 event;
-
-    event = cylinder_exit_event;
-    cylinder_exit_event = 0;
-    return event;
-}
-
-uint8 Cylinder_IsEntryLockedOut(void)
-{
-    return cylinder_entry_lockout;
-}
-
 uint8 Cylinder_GetState(void)
 {
     return cylinder_state;
-}
-
-float Cylinder_GetRotationProgress(void)
-{
-    return cylinder_rotation_progress_deg;
 }
 
 uint8 Cylinder_IsEntryLeftTurnGuardActive(void)
@@ -402,6 +292,38 @@ int16 Cylinder_LimitPreEntryDiff(int16 direction_diff)
     return direction_diff;
 }
 
+void Cylinder_UpdateGravityFeedforward(float pitch_sin)
+{
+    uint8 next_index;
+    float gravity_pwm;
+
+    if (!Cylinder_IsOnSurface())
+    {
+        gravity_pwm = 0.0f;
+    }
+    else
+    {
+        if (pitch_sin > 1.0f)
+            pitch_sin = 1.0f;
+        else if (pitch_sin < -1.0f)
+            pitch_sin = -1.0f;
+
+        gravity_pwm = -CYLINDER_GRAVITY_FF_PWM * pitch_sin;
+    }
+
+    next_index = (uint8)(cylinder_gravity_ff_active_index ^ 1U);
+    cylinder_gravity_ff_pwm[next_index] = (int16)gravity_pwm;
+    cylinder_gravity_ff_active_index = next_index;
+}
+
+int16 Cylinder_GetGravityFeedforwardPwm(void)
+{
+    uint8 index;
+
+    index = cylinder_gravity_ff_active_index;
+    return cylinder_gravity_ff_pwm[index];
+}
+
 void Cylinder_Reset(void)
 {
     /* 完整复位本轮检测历史；公开调用时不会保留自动复位锁定。 */
@@ -412,14 +334,12 @@ void Cylinder_Reset(void)
     cylinder_return_half_count = 0;
     cylinder_return_half_seen = 0;
     cylinder_exit_imu_count = 0;
-    cylinder_exit_em_count = 0;
-    cylinder_exit_em_ready = 0;
     cylinder_rearm_flat_count = 0;
     cylinder_rearm_clear_count = 0;
     cylinder_entry_lockout = 0;
     cylinder_rearm_lockout_count = 0;
     cylinder_rotation_progress_deg = 0.0f;
-    cylinder_exit_event = 0;
     cylinder_left_guard_active = 0;
     cylinder_state = CYLINDER_STATE_IDLE;
+    Cylinder_UpdateGravityFeedforward(0.0f);
 }

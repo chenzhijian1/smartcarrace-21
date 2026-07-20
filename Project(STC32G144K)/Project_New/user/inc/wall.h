@@ -10,16 +10,17 @@
  * 主循环把公共 IMU 特征交给 Wall_ImuUpdate()；该函数只负责识别阶段，
  * 不直接驱动电机。TIM4 控制中断通过下面的速度和差速函数读取阶段结果。
  * 轴约定采用当前实测结果：上坡 ay<0，横向时重力主要落在 ax，下坡 ay>0。
- * ax/ay/az 单位为 g；climb_angle_deg=atan2(-ay_lowpass,az_lowpass)。
+ * ax/ay/az单位为g；墙面入口使用与圆筒相同的euler.pitch<-5度，
+ * climb_angle_deg只保留作诊断参考。
  * 所有 *_SAMPLES 都是去重后的有效 IMU 帧数；“5 ms”只是当前配置。
  */
 
 /* ---------- 姿态识别阈值 ---------- */
 
-#define WALL_CLIMB_ENTER_DEG               (8.0f)//上坡候选要求 climb_angle_deg>=8度。调小更早触发但容易误判，调大更稳但触发更晚。
-/* 旧版直接使用ay的入口阈值，保留数值供历史调参对照，不再参与识别。 */
-/* #define WALL_CLIMB_AY_MIN_G             (-0.14f) */
-/* climb_angle_deg连续满足WALL_CLIMB_CONFIRM_SAMPLES帧后进入上坡候选。 */
+#define WALL_ENTRY_PITCH_MAX_DEG          (-5.0f)//与圆筒入口相同：euler.pitch<-5度才进入墙面候选。
+/* 旧版climb_angle_deg入口阈值保留作历史对照，不再参与识别。 */
+/* #define WALL_CLIMB_ENTER_DEG             (8.0f) */
+/* pitch连续满足WALL_CLIMB_CONFIRM_SAMPLES帧后进入上坡候选。 */
 
 #define WALL_VERTICAL_AY_MAX_G             (-0.75f)//近竖直要求 ay<=-0.75g。改得更负会更接近真正竖直，但确认更晚。
 #define WALL_VERTICAL_AZ_MAX_G             (0.45f)//近竖直要求 az<=0.45g，也用于排除仍接近平面的姿态。
@@ -57,6 +58,8 @@
 #define WALL_DESCENT_SPEED_ENABLE           (0U)//0关闭下坡减速，1开启下坡减速。
 #define WALL_DESCENT_SPEED_PERCENT          (75U)//仅在下坡减速开关打开时生效。
 
+#define WALL_GRAVITY_FF_PWM                (1600.0f)
+
 /* ---------- 横向抗重力方向偏置 ---------- */
 /*
  * 方向偏置的正负号必须用实车确认。默认关闭，避免符号错时把车推向墙外。
@@ -80,7 +83,8 @@
 
 void Wall_Init(void);//上电初始化入口，内部清空本模块全部状态。
 void Wall_Reset(void);//重置本模块状态，恢复到 IDLE。
-uint8 Wall_ImuUpdate(const spatial_features_t *features);//主循环每收到一个新IMU特征帧调用一次，内部推进状态机；非IDLE状态返回1。
+uint8 Wall_ImuUpdate(const spatial_features_t *features,
+                     float pitch_deg);//主循环每收到一个新IMU特征帧调用一次，使用与圆筒相同的pitch入口条件。
 uint8 Wall_IsCandidate(void);//上坡、近竖直、横向或下坡进行中返回1，EXITED不再算候选。
 uint8 Wall_IsConfirmed(void);//看到轮轴方向重力后返回1，用于元素管理器正式确认墙面。
 uint8 Wall_HasExited(void);//连续回到平面并进入 EXITED 后返回1。
@@ -91,5 +95,7 @@ void Wall_ClampWheelTargets(int16 center_speed,
                             int16 *left_speed,
                             int16 *right_speed);//供speed_adjust()之后调用：墙面进行中禁止某一侧轮速目标反向。
 int16 Wall_GetDirectionBias(void);//供TIM4控制链调用：横向阶段返回抗重力差速偏置，未启用或非横向时返回0。
+void Wall_UpdateGravityFeedforward(float pitch_sin);//主循环更新墙面重力前馈快照，输入为sin(pitch)。
+int16 Wall_GetGravityFeedforwardPwm(void);//TIM4控制链读取墙面重力前馈快照。
 
 #endif /* __WALL_H_ */

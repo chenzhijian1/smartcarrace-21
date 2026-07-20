@@ -126,14 +126,13 @@ void Element_ImuUpdate(const imu_sample_t *sample)
     switch ((element_type_t)element_current_type)
     {
         case ELEMENT_SEESAW:
-            (void)Seesaw_ImuUpdate(features);
+            (void)Seesaw_ImuUpdate(features, euler.pitch);
             if (Seesaw_HasExited())
                 element_complete(ELEMENT_SEESAW);
             break;
 
         case ELEMENT_CYLINDER:
-            cylinder_on_surface = Cylinder_ImuUpdate(sample->ax_g,
-                                                     sample->ay_g,
+            cylinder_on_surface = Cylinder_ImuUpdate(sample->ay_g,
                                                      sample->az_g,
                                                      sample->gx_dps,
                                                      euler.pitch);
@@ -148,7 +147,7 @@ void Element_ImuUpdate(const imu_sample_t *sample)
             break;
 
         case ELEMENT_WALL:
-            (void)Wall_ImuUpdate(features);
+            (void)Wall_ImuUpdate(features, euler.pitch);
             if (Wall_HasExited())
                 element_complete(ELEMENT_WALL);
             break;

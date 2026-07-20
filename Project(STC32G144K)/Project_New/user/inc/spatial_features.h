@@ -64,11 +64,6 @@ float spatial_accel_norm_g(float ax_g, float ay_g, float az_g);
 uint8 spatial_accel_norm_in_range(float norm_g,
                                   float min_g,
                                   float max_g);
-uint8 spatial_accel_vector_norm_in_range(float ax_g,
-                                         float ay_g,
-                                         float az_g,
-                                         float min_g,
-                                         float max_g);
 uint8 spatial_confirm_update(uint8 condition,
                              uint16 required_samples,
                              uint16 *count);
