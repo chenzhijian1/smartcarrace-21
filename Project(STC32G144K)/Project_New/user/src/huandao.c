@@ -12,6 +12,14 @@
 #define HUANDAO_ENTRY_BIAS_RATIO 0.60f
 #define HUANDAO_DETECT_CONFIRM_COUNT (3U)
 
+enum
+{
+    HUANDAO_DETECT_NORMAL = 0,
+    HUANDAO_DETECT_SUSPECT,
+    HUANDAO_DETECT_ACTIVE,
+    HUANDAO_DETECT_REARM
+};
+
 /*============================================================================
  * 模块说明：环岛控制模块
  * 功能：环岛状态机管理、参数存储
@@ -42,11 +50,11 @@ static uint8 huandao_angle_set = 0;
 static float huandao_enter_start_yaw = 0.0f;
 static float huandao_inside_start_yaw = 0.0f;
 
-volatile uint8 huandao_detect_state = HUANDAO_DETECT_NORMAL;
-float huandao_pre_h_threshold = 33.0f;
-float huandao_confirm_h_threshold = 55.0f;
-float huandao_suspect_max_distance = 350.0f;
-float huandao_rearm_h_threshold = 30.0f;
+static volatile uint8 huandao_detect_state = HUANDAO_DETECT_NORMAL;
+static float huandao_pre_h_threshold = 33.0f;
+static float huandao_confirm_h_threshold = 55.0f;
+static float huandao_suspect_max_distance = 350.0f;
+static float huandao_rearm_h_threshold = 30.0f;
 
 static uint8 huandao_pre_count = 0;
 static uint8 huandao_left_count = 0;
@@ -71,7 +79,7 @@ void Huandao_DetectReset(void)
     huandao_detect_reset_counters();
 }
 
-void Huandao_DetectStartRearm(void)
+static void huandao_detect_start_rearm(void)
 {
     huandao_detect_state = HUANDAO_DETECT_REARM;
     huandao_detect_reset_counters();
@@ -155,7 +163,7 @@ uint8 Huandao_DetectUpdate(void)
     }
 
     if (element_distance >= huandao_suspect_max_distance)
-        Huandao_DetectStartRearm();
+        huandao_detect_start_rearm();
 
     return (uint8)(huandao_detect_state == HUANDAO_DETECT_SUSPECT);
 }
@@ -268,7 +276,7 @@ void Huandao_ExitStraight(void) {
     else {
         // 恢复到正常循迹
         flag = 0;
-        Huandao_DetectStartRearm();
+        huandao_detect_start_rearm();
         huandao_exit_event = 1;
         Huandao_Reset();
         if (huandao_num > 0) {

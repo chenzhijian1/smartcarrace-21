@@ -19,19 +19,9 @@
 /*---------------------------------------------------------------------------
  * 常量定义
  *---------------------------------------------------------------------------*/
-#define CAR_WIDTH 13.0f  // 车宽(cm)
-
 #define HUANDAO_DIR_SOURCE_ROUTE  (0)
 #define HUANDAO_DIR_SOURCE_SENSOR (1)
 #define HUANDAO_MAX_COUNT          (5)
-
-typedef enum
-{
-    HUANDAO_DETECT_NORMAL = 0,
-    HUANDAO_DETECT_SUSPECT,
-    HUANDAO_DETECT_ACTIVE,
-    HUANDAO_DETECT_REARM
-} huandao_detect_state_t;
 
 /*---------------------------------------------------------------------------
  * 环岛参数配置
@@ -48,13 +38,6 @@ extern float distance_before_huandao[HUANDAO_MAX_COUNT];
  * 环岛状态变量
  *---------------------------------------------------------------------------*/
 extern uint8 flag_huandao;      // 0:左环岛, 1:右环岛
-extern volatile uint8 huandao_detect_state;
-
-extern float huandao_pre_h_threshold;
-extern float huandao_confirm_h_threshold;
-extern float huandao_suspect_max_distance;
-extern float huandao_rearm_h_threshold;
-
 /*---------------------------------------------------------------------------
  * 函数声明
  *---------------------------------------------------------------------------*/
@@ -71,7 +54,6 @@ void Huandao_ExitStraight(void);    // 出环直行(flag=7)
 uint8 Huandao_DetectUpdate(void);
 uint8 Huandao_DetectIsStraightHold(void);
 void Huandao_DetectReset(void);
-void Huandao_DetectStartRearm(void);
 uint8 Huandao_ConsumeExitEvent(void);
 
 // 辅助函数
