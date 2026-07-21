@@ -54,12 +54,10 @@ static void element_update_gravity_feedforward(void)
     switch ((element_type_t)element_current_type)
     {
         case ELEMENT_CYLINDER:
-            Cylinder_UpdateGravityFeedforward(pitch_sin);
-            feedforward_pwm = Cylinder_GetGravityFeedforwardPwm();
+            feedforward_pwm = Cylinder_CalcGravityFeedforward(pitch_sin);
             break;
         case ELEMENT_WALL:
-            Wall_UpdateGravityFeedforward(pitch_sin);
-            feedforward_pwm = Wall_GetGravityFeedforwardPwm();
+            feedforward_pwm = Wall_CalcGravityFeedforward(pitch_sin);
             break;
         default:
             break;
@@ -238,8 +236,6 @@ void Element_PrepareControl(int16 straight_speed,
         case ELEMENT_WALL:
             *target_speed = Wall_GetSpeedTarget(*target_speed,
                                                 straight_speed);
-            *direction_diff = (int16)(*direction_diff +
-                                      Wall_GetDirectionBias());
             break;
         default:
             break;

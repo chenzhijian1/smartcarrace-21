@@ -12,13 +12,8 @@ static uint16 wall_exit_count = 0;
 static uint16 wall_candidate_age = 0;
 static uint8 wall_norm_invalid_count = 0;
 static uint8 wall_lateral_seen = 0;
-static volatile int8 wall_lateral_side = 0;
 
-/* 主循环写非活动槽，读取方只访问活动槽。 */
-static volatile int16 wall_gravity_ff_pwm[2] = {0, 0};
-static volatile uint8 wall_gravity_ff_active_index = 0;
-
-/* 清除本次候选的计数和横向侧别证据，保留基线由 Wall_Reset() 负责。 */
+/* 清除本次候选的计数和横向证据，保留基线由 Wall_Reset() 负责。 */
 static void wall_clear_candidate(void)
 {
     wall_state = WALL_STATE_IDLE;
@@ -30,48 +25,27 @@ static void wall_clear_candidate(void)
     wall_candidate_age = 0;
     wall_norm_invalid_count = 0;
     wall_lateral_seen = 0;
-    wall_lateral_side = 0;
 }
 
-/* 完整清空墙面状态机、连续帧计数和已锁定的横向方向。 */
+/* 完整清空墙面状态机、连续帧计数和横向确认状态。 */
 void Wall_Reset(void)
 {
     wall_baseline_count = 0;
     wall_baseline_seen = 0;
     wall_clear_candidate();
-    Wall_UpdateGravityFeedforward(0.0f);
 }
 
-void Wall_UpdateGravityFeedforward(float pitch_sin)
+int16 Wall_CalcGravityFeedforward(float pitch_sin)
 {
-    uint8 next_index;
-    float gravity_pwm;
+    if (wall_state == WALL_STATE_IDLE || wall_state == WALL_STATE_EXITED)
+        return 0;
 
-    if (!Wall_IsCandidate())
-    {
-        gravity_pwm = 0.0f;
-    }
-    else
-    {
-        if (pitch_sin > 1.0f)
-            pitch_sin = 1.0f;
-        else if (pitch_sin < -1.0f)
-            pitch_sin = -1.0f;
+    if (pitch_sin > 1.0f)
+        pitch_sin = 1.0f;
+    else if (pitch_sin < -1.0f)
+        pitch_sin = -1.0f;
 
-        gravity_pwm = -WALL_GRAVITY_FF_PWM * pitch_sin;
-    }
-
-    next_index = (uint8)(wall_gravity_ff_active_index ^ 1U);
-    wall_gravity_ff_pwm[next_index] = (int16)gravity_pwm;
-    wall_gravity_ff_active_index = next_index;
-}
-
-int16 Wall_GetGravityFeedforwardPwm(void)
-{
-    uint8 index;
-
-    index = wall_gravity_ff_active_index;
-    return wall_gravity_ff_pwm[index];
+    return (int16)(-WALL_GRAVITY_FF_PWM * pitch_sin);
 }
 
 /*
@@ -221,7 +195,6 @@ void Wall_ImuUpdate(const imu_sample_t *sample, float pitch_deg)
         {
             wall_state = WALL_STATE_LATERAL;
             wall_lateral_seen = 1;
-            wall_lateral_side = sample->ax_g >= 0.0f ? 1 : -1;
             wall_lateral_count = 0;
             wall_descent_count = 0;
         }
@@ -277,16 +250,6 @@ void Wall_ImuUpdate(const imu_sample_t *sample, float pitch_deg)
     {
         wall_exit_count = 0;
     }
-
-}
-
-/* 返回墙面进行中的四个阶段；LATERAL/DESCENT 已有较强身份依据但未退出。 */
-uint8 Wall_IsCandidate(void)
-{
-    return (uint8)(wall_state == WALL_STATE_CLIMB_CANDIDATE ||
-                   wall_state == WALL_STATE_VERTICAL_PROVISIONAL ||
-                   wall_state == WALL_STATE_LATERAL ||
-                   wall_state == WALL_STATE_DESCENT);
 }
 
 /* 仅在 EXITED 时返回 1，供元素管理器释放墙面控制并推进路线。 */
@@ -344,15 +307,6 @@ int16 Wall_GetSpeedTarget(int16 current_speed, int16 straight_speed)
                                         straight_speed,
                                         WALL_LATERAL_SPEED_PERCENT);
 
-    case WALL_STATE_DESCENT:
-#if WALL_DESCENT_SPEED_ENABLE
-        return wall_target_from_percent(current_speed,
-                                        straight_speed,
-                                        WALL_DESCENT_SPEED_PERCENT);
-#else
-        return current_speed;
-#endif
-
     default:
         return current_speed;
     }
@@ -395,20 +349,4 @@ void Wall_ClampWheelTargets(int16 center_speed,
         *left_speed = spatial_clamp_i16(*left_speed, low, high);
         *right_speed = spatial_clamp_i16(*right_speed, low, high);
     }
-}
-
-/*
- * 返回横向阶段的抗重力固定差速前馈；默认关闭，未标定时始终返回 0。
- */
-int16 Wall_GetDirectionBias(void)
-{
-#if WALL_DIRECTION_BIAS_ENABLE
-    if (wall_state == WALL_STATE_LATERAL && wall_lateral_side != 0)
-    {
-        return (int16)(wall_lateral_side *
-                       WALL_DIRECTION_BIAS_SIGN *
-                       WALL_DIRECTION_BIAS_VALUE);
-    }
-#endif
-    return 0;
 }

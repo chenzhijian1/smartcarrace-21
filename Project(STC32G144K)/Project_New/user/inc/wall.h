@@ -49,21 +49,7 @@
 #define WALL_VERTICAL_SPEED_PERCENT         (75U)//近竖直阶段最高使用普通直线目标的75%。
 #define WALL_LATERAL_SPEED_PERCENT          (90U)//横向阶段最高使用普通直线目标的90%。
 
-/* 当前赛道下坡后接直道，所以默认不主动减速。ENABLE 改为 1 后才启用下面的 75% 上限。 */
-#define WALL_DESCENT_SPEED_ENABLE           (0U)//0关闭下坡减速，1开启下坡减速。
-#define WALL_DESCENT_SPEED_PERCENT          (75U)//仅在下坡减速开关打开时生效。
-
 #define WALL_GRAVITY_FF_PWM                (1600.0f)
-
-/* ---------- 横向抗重力方向偏置 ---------- */
-/*
- * 方向偏置的正负号必须用实车确认。默认关闭，避免符号错时把车推向墙外。
- * ENABLE=1 后，横向阶段会按 ax 符号加入固定差速 VALUE；VALUE 是方向环
- * 的差速目标单位，不是角度或 PWM。SIGN 只能取 +1 或 -1。
- */
-#define WALL_DIRECTION_BIAS_ENABLE          (0U)//0关闭，1只在 LATERAL 横向阶段加入抗重力固定差速。
-#define WALL_DIRECTION_BIAS_SIGN            (1)//只能取+1或-1，用实车确认哪个方向是朝墙内修正。
-#define WALL_DIRECTION_BIAS_VALUE           (25)//加入 changed_speed 的差速目标值，不是角度、速度百分比或PWM。
 
 /* ---------- 状态机状态 ---------- */
 #define WALL_STATE_IDLE                    (0U)//尚未识别到有效墙面上坡。
@@ -79,7 +65,6 @@
 void Wall_Reset(void);//重置本模块状态，恢复到 IDLE。
 void Wall_ImuUpdate(const imu_sample_t *sample,
                     float pitch_deg);//主循环每收到一个新IMU样本调用一次，使用与圆筒相同的pitch入口条件。
-uint8 Wall_IsCandidate(void);//上坡、近竖直、横向或下坡进行中返回1，EXITED不再算候选。
 uint8 Wall_HasExited(void);//连续回到平面并进入 EXITED 后返回1。
 uint8 Wall_GetState(void);//返回当前墙面状态，供控制中断、元素管理器和调试打印读取。
 
@@ -87,8 +72,6 @@ int16 Wall_GetSpeedTarget(int16 current_speed, int16 straight_speed);//供TIM4�
 void Wall_ClampWheelTargets(int16 center_speed,
                             int16 *left_speed,
                             int16 *right_speed);//供speed_adjust()之后调用：墙面进行中禁止某一侧轮速目标反向。
-int16 Wall_GetDirectionBias(void);//供TIM4控制链调用：横向阶段返回抗重力差速偏置，未启用或非横向时返回0。
-void Wall_UpdateGravityFeedforward(float pitch_sin);//主循环更新墙面重力前馈快照，输入为sin(pitch)。
-int16 Wall_GetGravityFeedforwardPwm(void);//TIM4控制链读取墙面重力前馈快照。
+int16 Wall_CalcGravityFeedforward(float pitch_sin);//按当前墙面状态计算重力前馈，输入为sin(pitch)。
 
 #endif /* __WALL_H_ */

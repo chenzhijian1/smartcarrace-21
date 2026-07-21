@@ -81,8 +81,7 @@ uint8 Cylinder_HasExited(void);        /* 本轮是否已确认退出 */
 uint8 Cylinder_GetState(void);         /* CYLINDER_STATE_xxx */
 uint8 Cylinder_IsEntryLeftTurnGuardActive(void);
 int16 Cylinder_LimitPreEntryDiff(int16 direction_diff);
-void Cylinder_UpdateGravityFeedforward(float pitch_sin);
-int16 Cylinder_GetGravityFeedforwardPwm(void);
+int16 Cylinder_CalcGravityFeedforward(float pitch_sin);
 
 void Cylinder_Reset(void); /* 清除状态、进度和确认计数 */
 

@@ -30,9 +30,6 @@ static uint16 cylinder_rearm_lockout_count = 0;
 /* 圆筒位置判定使用的粗略运动进度，不属于桶面转向控制器输出。 */
 static float cylinder_rotation_progress_deg = 0.0f; /* |gyro_x|积分，0到360度 */
 
-static volatile int16 cylinder_gravity_ff_pwm[2] = {0, 0};
-static volatile uint8 cylinder_gravity_ff_active_index = 0;
-
 static uint8 cylinder_climb_signal_is_present(float pitch_deg);
 
 /* 当前电感帧是否满足入口候选条件，只判断单帧。 */
@@ -286,36 +283,17 @@ int16 Cylinder_LimitPreEntryDiff(int16 direction_diff)
     return direction_diff;
 }
 
-void Cylinder_UpdateGravityFeedforward(float pitch_sin)
+int16 Cylinder_CalcGravityFeedforward(float pitch_sin)
 {
-    uint8 next_index;
-    float gravity_pwm;
-
     if (!Cylinder_IsOnSurface())
-    {
-        gravity_pwm = 0.0f;
-    }
-    else
-    {
-        if (pitch_sin > 1.0f)
-            pitch_sin = 1.0f;
-        else if (pitch_sin < -1.0f)
-            pitch_sin = -1.0f;
+        return 0;
 
-        gravity_pwm = -CYLINDER_GRAVITY_FF_PWM * pitch_sin;
-    }
+    if (pitch_sin > 1.0f)
+        pitch_sin = 1.0f;
+    else if (pitch_sin < -1.0f)
+        pitch_sin = -1.0f;
 
-    next_index = (uint8)(cylinder_gravity_ff_active_index ^ 1U);
-    cylinder_gravity_ff_pwm[next_index] = (int16)gravity_pwm;
-    cylinder_gravity_ff_active_index = next_index;
-}
-
-int16 Cylinder_GetGravityFeedforwardPwm(void)
-{
-    uint8 index;
-
-    index = cylinder_gravity_ff_active_index;
-    return cylinder_gravity_ff_pwm[index];
+    return (int16)(-CYLINDER_GRAVITY_FF_PWM * pitch_sin);
 }
 
 void Cylinder_Reset(void)
@@ -335,5 +313,4 @@ void Cylinder_Reset(void)
     cylinder_rotation_progress_deg = 0.0f;
     cylinder_left_guard_active = 0;
     cylinder_state = CYLINDER_STATE_IDLE;
-    Cylinder_UpdateGravityFeedforward(0.0f);
 }
