@@ -1,5 +1,4 @@
 #include "element.h"
-#include "spatial_features.h"
 #include "seesaw.h"
 #include "cylinder.h"
 #include "huandao.h"
@@ -101,7 +100,6 @@ static void element_update_cylinder_fan(uint8 on_surface)
 static void element_reset_type(element_type_t type)
 {
     motor_set_feedforward_pwm(0);
-    SpatialFeatures_Reset();
 
     switch (type)
     {
@@ -144,7 +142,6 @@ static void element_complete(element_type_t completed_type)
 
 void Element_Init(void)
 {
-    SpatialFeatures_Init();
     Seesaw_Init();
     Cylinder_Init();
     Huandao_DetectReset();
@@ -160,19 +157,15 @@ void Element_Init(void)
 
 void Element_ImuUpdate(const imu_sample_t *sample)
 {
-    const spatial_features_t *features;
     uint8 cylinder_on_surface;
 
     if (sample == (const imu_sample_t *)0)
         return;
 
-    SpatialFeatures_Update(sample);
-    features = SpatialFeatures_Get();
-
     switch ((element_type_t)element_current_type)
     {
         case ELEMENT_SEESAW:
-            (void)Seesaw_ImuUpdate(features, euler.pitch);
+            (void)Seesaw_ImuUpdate(sample, euler.pitch);
             if (Seesaw_HasExited())
                 element_complete(ELEMENT_SEESAW);
             break;
@@ -193,7 +186,7 @@ void Element_ImuUpdate(const imu_sample_t *sample)
             break;
 
         case ELEMENT_WALL:
-            (void)Wall_ImuUpdate(features, euler.pitch);
+            (void)Wall_ImuUpdate(sample, euler.pitch);
             if (Wall_HasExited())
                 element_complete(ELEMENT_WALL);
             break;

@@ -2,32 +2,27 @@
 #define __WALL_H_
 
 #include "zf_common_typedef.h"
-#include "spatial_features.h"
+#include "quaternion.h"
 
 /*
  * 墙面元素模块。
  *
- * 主循环把公共 IMU 特征交给 Wall_ImuUpdate()；该函数只负责识别阶段，
+ * 主循环把当前 IMU 样本交给 Wall_ImuUpdate()；该函数只负责识别阶段，
  * 不直接驱动电机。TIM4 控制中断通过下面的速度和差速函数读取阶段结果。
  * 轴约定采用当前实测结果：上坡 ay<0，横向时重力主要落在 ax，下坡 ay>0。
- * ax/ay/az单位为g；墙面入口使用与圆筒相同的euler.pitch<-5度，
- * climb_angle_deg只保留作诊断参考。
+ * ax/ay/az直接使用当前换算值，单位为g；墙面入口使用与圆筒相同的
+ * euler.pitch<-5度。
  * 所有 *_SAMPLES 都是去重后的有效 IMU 帧数；“5 ms”只是当前配置。
  */
 
 /* ---------- 姿态识别阈值 ---------- */
 
 #define WALL_ENTRY_PITCH_MAX_DEG          (-5.0f)//与圆筒入口相同：euler.pitch<-5度才进入墙面候选。
-/* 旧版climb_angle_deg入口阈值保留作历史对照，不再参与识别。 */
-/* #define WALL_CLIMB_ENTER_DEG             (8.0f) */
 /* pitch连续满足WALL_CLIMB_CONFIRM_SAMPLES帧后进入上坡候选。 */
 
 #define WALL_VERTICAL_AY_MAX_G             (-0.75f)//近竖直要求 ay<=-0.75g。改得更负会更接近真正竖直，但确认更晚。
 #define WALL_VERTICAL_AZ_MAX_G             (0.45f)//近竖直要求 az<=0.45g，也用于排除仍接近平面的姿态。
-#define WALL_INVERTED_AZ_MAX_G             (-0.35f)//若 az<=-0.35g 或公共特征判为倒置，则撤销墙面候选，避免把圆筒当成墙面。
-#define WALL_EXIT_AY_MAX_G                 (0.15f)//退出要求 |ay|<=0.15g。调小更严格，调大更容易提前确认回平。
-#define WALL_EXIT_AZ_MIN_G                 (0.85f)//退出还要求 az>=0.85g。调高更严格，调低更容易确认回平。
-
+#define WALL_INVERTED_AZ_MAX_G             (-0.35f)//若当前 az<=-0.35g，则撤销墙面候选，避免把圆筒当成墙面。
 #define WALL_LATERAL_AX_MIN_G              (0.70f)//横向段要求 |ax|>=0.70g，证明重力主要落在轮轴方向；调高更严格。
 #define WALL_VERTICAL_AX_MAX_G             (0.70f)//近竖直阶段要求 |ax|<=0.70g，防止把已经横向的姿态继续当成近竖直。
 /* 两个 0.70g 不是重复参数：前者是进入横向段的下限，后者是近竖直段的上限。 */
@@ -83,8 +78,8 @@
 
 void Wall_Init(void);//上电初始化入口，内部清空本模块全部状态。
 void Wall_Reset(void);//重置本模块状态，恢复到 IDLE。
-uint8 Wall_ImuUpdate(const spatial_features_t *features,
-                     float pitch_deg);//主循环每收到一个新IMU特征帧调用一次，使用与圆筒相同的pitch入口条件。
+uint8 Wall_ImuUpdate(const imu_sample_t *sample,
+                     float pitch_deg);//主循环每收到一个新IMU样本调用一次，使用与圆筒相同的pitch入口条件。
 uint8 Wall_IsCandidate(void);//上坡、近竖直、横向或下坡进行中返回1，EXITED不再算候选。
 uint8 Wall_IsConfirmed(void);//看到轮轴方向重力后返回1，用于元素管理器正式确认墙面。
 uint8 Wall_HasExited(void);//连续回到平面并进入 EXITED 后返回1。

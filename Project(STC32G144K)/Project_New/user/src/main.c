@@ -1,6 +1,5 @@
 #include "headfile.h"
 #include "element.h"
-#include "spatial_features.h"
 #include "seesaw.h"
 #include "cylinder.h"
 #include "wall.h"
@@ -10,8 +9,6 @@ uint8 uart_output_mode = 0;
 
 void uart_telemetry_print(void)
 {
-    const spatial_features_t *features = SpatialFeatures_Get();
-
     switch (uart_output_mode)
     {
         case 0:
@@ -56,8 +53,7 @@ void uart_telemetry_print(void)
             printf("%u,%u,", Element_GetRouteIndex(), Element_GetCurrent());
             printf("%u,%u,%u,", Seesaw_GetState(), Cylinder_GetState(),
                    Wall_GetState());
-            printf("%.3f,%.3f,", features->ay_g, features->az_g);
-            printf("%.2f\r\n", features->climb_angle_deg);
+            printf("%.2f\r\n", euler.pitch);
             break;
 
         case 5:

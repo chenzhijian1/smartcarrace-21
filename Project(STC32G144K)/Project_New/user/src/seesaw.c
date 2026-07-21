@@ -10,13 +10,13 @@
  *   通过 Seesaw_ImuUpdate() 在每个 IMU 帧中推进。
  * - **速度控制**：在 RISING 阶段限制车速和左右轮差速，防止车辆在跷跷板上
  *   因姿态变化导致控制失稳；FALLING 之后恢复正常速度。
- * - **外部接口**：本模块不直接操作电机、不读取传感器，只接收
- *   spatial_features_t 特征快照并发布状态，供元素管理器和控制链调用。
+ * - **外部接口**：本模块不直接操作电机，只接收当前 IMU 样本和 pitch，
+ *   并发布状态供元素管理器和控制链调用。
  *
  * ## 数据流
  * ```
- * IMU采样 → SpatialFeatures → Seesaw_ImuUpdate() → 状态机
- *                                                    ↓
+ * IMU采样 → Seesaw_ImuUpdate() → 状态机
+ *                                  ↓
  * TIM4 5ms中断 → Seesaw_GetSpeedTarget() / Seesaw_ClampWheelTargets() → 电机
  * ```
  *
@@ -25,21 +25,20 @@
  *    避免车辆在非平面路段误判。
  * 2. **倾角峰值**：跟踪上升过程中的最大倾角，只有峰值超过最小有效峰值
  *    且出现持续下降趋势后才确认进入 FALLING。
- * 3. **陀螺辅助证据**：记录登板时 gx 的初始方向，检测反向旋转作为转折
- *    辅助证据，但不单独决定状态切换。
- * 4. **候选超时**：超过 SEESAW_MAX_CANDIDATE_SAMPLES 帧或姿态倒置时
+ * 3. **候选超时**：超过 SEESAW_MAX_CANDIDATE_SAMPLES 帧或姿态倒置时
  *    自动撤销候选，防止状态机卡死。
- * 5. **模长容错**：加速度模长短时间超出有效范围时给予宽限期，避免因瞬时
+ * 4. **模长容错**：加速度模长短时间超出有效范围时给予宽限期，避免因瞬时
  *    振动丢失候选。
  *
  * ## 坐标系约定
- * - ax/ay/az 单位为 g，gx 单位为度/秒
+ * - ax/ay/az 单位为 g
  * - pitch直接由姿态解算传入；实车抬起时为负，下降时为正
  * - 跷跷板入口、抬起峰值和下降判断统一使用pitch，单位为度
  * - 所有 *_SAMPLES 表示去重后的有效 IMU 帧数（约 5ms/帧）
  */
 
 #include "seesaw.h"
+#include "spatial_features.h"
 
 /* ==========================================================================
  * 模块静态变量
@@ -54,9 +53,6 @@ static uint16 seesaw_exit_count = 0; // 回到平面连续确认帧计数（进�
 static uint16 seesaw_candidate_age = 0; // 候选已存活帧数，用于超时检测
 static uint8 seesaw_norm_invalid_count = 0; // 加速度模长连续无效帧计数
 static float seesaw_peak_tilt_deg = 0.0f; // 本次候选期间记录的最大上仰角，单位度
-static int8 seesaw_motion_sign = 0; // 登板时 gx 角速度的初始方向：1 正转，-1 反转，0 未记录
-static uint8 seesaw_reverse_seen = 0; // 是否已检测到 gx 反向（1 已反向，0 未反向）
-static uint16 seesaw_reverse_count = 0; // gx 反向连续确认帧计数
 
 /* ==========================================================================
  * 静态辅助函数
@@ -77,7 +73,7 @@ static float seesaw_rising_tilt_deg(float pitch_deg)
  * @note   不清除平面基线（seesaw_baseline_seen 和 seesaw_baseline_count），
  *          因为基线是相对稳定的环境信息，无需每次候选结束都重新建立。
  *          清除的包括：状态、进入计数、趋势计数、退出计数、候选年龄、
- *          模长无效计数、峰值倾角、运动方向标志、反向检测标志。
+ *          模长无效计数和峰值倾角。
  */
 static void seesaw_clear_candidate(void)
 {
@@ -88,9 +84,6 @@ static void seesaw_clear_candidate(void)
     seesaw_candidate_age = 0;
     seesaw_norm_invalid_count = 0;
     seesaw_peak_tilt_deg = 0.0f;
-    seesaw_motion_sign = 0;
-    seesaw_reverse_seen = 0;
-    seesaw_reverse_count = 0;
 }
 
 /**
@@ -115,64 +108,9 @@ void Seesaw_Init(void)
 }
 
 /**
- * @brief  更新 gx 角速度运动方向检测。
- * @param  features  IMU 特征快照指针。
- *
- * 工作机制：
- * 1. 当 gx 角速度绝对值低于 SEESAW_GYRO_MOTION_MIN_DPS 时，视为无有效
- *    运动，重置反向计数但不改变已记录的方向。
- * 2. 首次检测到有效角速度时，记录其方向为 seesaw_motion_sign（+1 或 -1）。
- * 3. 之后持续检测 gx 是否反向（越过阈值），使用 spatial_confirm_update()
- *    连续确认 SEESAW_GYRO_REVERSE_CONFIRM_SAMPLES 帧后设置
- *    seesaw_reverse_seen = 1。
- *
- * @note   该函数只产生"转折辅助证据"，不单独决定状态切换；
- *          主判断仍以倾角趋势（seesaw_trend_count）为准。
- *          陀螺反向证据用于加速 FALLING 状态的确认。
- */
-static void seesaw_update_motion_sign(const spatial_features_t *features)
-{
-    uint8 reverse_condition;  /* 是否检测到 gx 反向 */
-
-    /* 角速度太小，忽略 */
-    if (features->gx_abs_dps < SEESAW_GYRO_MOTION_MIN_DPS)
-    {
-        seesaw_reverse_count = 0;
-        return;
-    }
-
-    /* 首次记录运动方向 */
-    if (seesaw_motion_sign == 0)
-    {
-        seesaw_motion_sign = features->gx_dps >= 0.0f ? 1 : -1;
-        seesaw_reverse_count = 0;
-    }
-    else
-    {
-        /* 检查是否与初始方向相反 */
-        reverse_condition = (uint8)(
-            (seesaw_motion_sign > 0 &&
-             features->gx_dps <= -SEESAW_GYRO_MOTION_MIN_DPS) ||
-            (seesaw_motion_sign < 0 &&
-             features->gx_dps >= SEESAW_GYRO_MOTION_MIN_DPS));
-
-        /* 连续确认反向 */
-        if (spatial_confirm_update(
-                reverse_condition,
-                SEESAW_GYRO_REVERSE_CONFIRM_SAMPLES,
-                &seesaw_reverse_count))
-        {
-            seesaw_reverse_seen = 1;
-            /* 饱和保持，避免计数器溢出 */
-            seesaw_reverse_count =
-                SEESAW_GYRO_REVERSE_CONFIRM_SAMPLES;
-        }
-    }
-}
-
-/**
- * @brief  主循环跷跷板状态机入口，每个去重后的 IMU 特征帧调用一次。
- * @param  features  IMU 特征快照指针（不可为 NULL）。
+ * @brief  主循环跷跷板状态机入口，每个去重后的 IMU 样本调用一次。
+ * @param  sample    当前 IMU 样本指针（不可为 NULL）。
+ * @param  pitch_deg 姿态解算俯仰角，单位度。
  * @return 当前状态非 IDLE 时返回 1，IDLE 时返回 0。
  *
  * ## 状态机说明
@@ -209,15 +147,27 @@ static void seesaw_update_motion_sign(const spatial_features_t *features)
  *          速度限制由 Seesaw_GetSpeedTarget() 和 Seesaw_ClampWheelTargets()
  *          在 TIM4 中断中根据状态机状态独立执行。
  */
-uint8 Seesaw_ImuUpdate(const spatial_features_t *features, float pitch_deg)
+uint8 Seesaw_ImuUpdate(const imu_sample_t *sample, float pitch_deg)
 {
     float tilt_deg;      /* 负pitch对应的抬起角度幅值，单位度 */
     uint8 tilt_valid;    /* 上坡条件是否满足 */
     uint8 trend_valid;   /* 下降趋势是否满足 */
+    uint8 norm_valid;
+    uint8 flat;
+    uint8 inverted;
 
     /* 空指针保护 */
-    if (features == (const spatial_features_t *)0)
+    if (sample == (const imu_sample_t *)0)
         return 0;
+
+    norm_valid = spatial_accel_vector_norm_in_range(
+        sample->ax_g, sample->ay_g, sample->az_g,
+        SPATIAL_NORM_MIN_G, SPATIAL_NORM_MAX_G);
+    flat = (uint8)(norm_valid &&
+                   spatial_absf(sample->ay_g) <= SPATIAL_FLAT_AY_MAX_G &&
+                   sample->az_g >= SPATIAL_FLAT_AZ_MIN_G);
+    inverted = (uint8)(norm_valid &&
+                       sample->az_g <= SPATIAL_INVERTED_AZ_MAX_G);
 
     /* ==================================================================
      * IDLE 状态：建立平面基线 + 检测上坡候选
@@ -229,7 +179,7 @@ uint8 Seesaw_ImuUpdate(const spatial_features_t *features, float pitch_deg)
          * 只有在平面（flat）上连续确认足够帧数后，才认为基线已建立。
          * 基线建立之前，任何上坡倾角都不会被接受为候选。
          */
-        if (features->flat)
+        if (flat)
         {
             if (spatial_confirm_update(1,
                                        SEESAW_BASELINE_CONFIRM_SAMPLES,
@@ -259,14 +209,14 @@ uint8 Seesaw_ImuUpdate(const spatial_features_t *features, float pitch_deg)
         tilt_deg = seesaw_rising_tilt_deg(pitch_deg);
         tilt_valid = (uint8)(
             seesaw_baseline_seen &&
-            features->norm_valid &&
-            features->az_lowpass_g >= SEESAW_AZ_MIN_G &&
+            norm_valid &&
+            sample->az_g >= SEESAW_AZ_MIN_G &&
             tilt_deg >= SEESAW_TILT_ENTER_DEG &&
             tilt_deg <= SEESAW_TILT_MAX_DEG);
 
         /*
          * 步骤 3：连续确认后进入 RISING 状态。
-         * 同时初始化峰值倾角、运动方向等候选数据。
+         * 同时初始化峰值倾角等候选数据。
          */
         if (spatial_confirm_update(tilt_valid,
                                    SEESAW_ENTER_CONFIRM_SAMPLES,
@@ -277,9 +227,6 @@ uint8 Seesaw_ImuUpdate(const spatial_features_t *features, float pitch_deg)
             seesaw_peak_tilt_deg = tilt_deg;
             seesaw_trend_count = 0;
             seesaw_exit_count = 0;
-            seesaw_motion_sign = 0;
-            seesaw_reverse_seen = 0;
-            seesaw_reverse_count = 0;
             seesaw_enter_count = 0;
         }
 
@@ -302,14 +249,14 @@ uint8 Seesaw_ImuUpdate(const spatial_features_t *features, float pitch_deg)
 
     /* 超时或姿态倒置 → 撤销候选 */
     if (seesaw_candidate_age > SEESAW_MAX_CANDIDATE_SAMPLES ||
-        features->inverted)
+        inverted)
     {
         seesaw_clear_candidate();
         return 0;
     }
 
     /* 加速度模长无效容错 */
-    if (!features->norm_valid)
+    if (!norm_valid)
     {
         if (seesaw_norm_invalid_count <
             SEESAW_NORM_INVALID_GRACE_SAMPLES)
@@ -330,14 +277,11 @@ uint8 Seesaw_ImuUpdate(const spatial_features_t *features, float pitch_deg)
     tilt_deg = seesaw_rising_tilt_deg(pitch_deg);
     if (pitch_deg > SEESAW_TILT_MAX_DEG ||
         pitch_deg < -SEESAW_TILT_MAX_DEG ||
-        features->az_lowpass_g < SEESAW_AZ_MIN_G)
+        sample->az_g < SEESAW_AZ_MIN_G)
     {
         seesaw_clear_candidate();
         return 0;
     }
-
-    /* 更新陀螺运动方向检测 */
-    seesaw_update_motion_sign(features);
 
     /* 更新峰值倾角 */
     if (tilt_deg > seesaw_peak_tilt_deg)
@@ -367,7 +311,7 @@ uint8 Seesaw_ImuUpdate(const spatial_features_t *features, float pitch_deg)
          * 短暂倾斜后立即回平不足以识别跷跷板。
          * 如果在平地上峰值仍小于最小有效峰值，放弃候选。
          */
-        if (features->flat &&
+        if (flat &&
             seesaw_peak_tilt_deg < SEESAW_TILT_MIN_PEAK_DEG)
         {
             seesaw_clear_candidate();
@@ -404,7 +348,7 @@ uint8 Seesaw_ImuUpdate(const spatial_features_t *features, float pitch_deg)
      * ================================================================== */
     if (seesaw_state == SEESAW_STATE_ACTIVE)
     {
-        if (features->flat)
+        if (flat)
         {
             /* 连续回到平面后退出 */
             if (spatial_confirm_update(1,

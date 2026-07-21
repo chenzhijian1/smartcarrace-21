@@ -2,7 +2,7 @@
 #define __SEESAW_H_
 
 #include "zf_common_typedef.h"
-#include "spatial_features.h"
+#include "quaternion.h"
 
 /*
  * 跷跷板识别和控制模块。
@@ -11,8 +11,8 @@
  * TIM4 的 5 ms 控制中断内读取状态，并调用下面的速度/轮速辅助函数。
  * 这里的宏只影响识别阈值或“编码器目标速度”，不直接代表 PWM 占空比。
  * 规则中的长度、宽度和高度只作为识别背景，不在本文件中参与几何计算。
- * ax/ay/az 单位为 g，gx 单位为度/秒；climb_angle_deg 由
- * atan2(-ay_lowpass, az_lowpass) 得到，当前安装方向下正角表示车头上仰。
+ * ax/ay/az 直接取当前 IMU 换算值，单位为 g；入口和转折使用
+ * 姿态解算得到的 euler.pitch，当前安装方向下负角表示车头上仰。
  * 所有 *_SAMPLES 都表示去重后的有效 IMU 帧数；“5 ms”只是当前配置。
  */
 
@@ -22,15 +22,7 @@
 #define SEESAW_TILT_MIN_PEAK_DEG          (8.0f)  // 抬起阶段 |-pitch| 至少达到 8°。
 #define SEESAW_TILT_MAX_DEG               (40.0f) // |pitch| 超过 40°时撤销跷跷板候选。
 
-/* 旧版直接使用-ay重力分量的阈值，保留数值供历史调参对照，不再参与识别。 */
-/* #define SEESAW_PITCH_ENTER_G           (0.1392f) */
-/* #define SEESAW_PITCH_MIN_PEAK_G        (0.2588f) */
-/* #define SEESAW_PITCH_MAX_G             (0.8660f) */
-/* #define SEESAW_PITCH_DROP_G            (0.1045f) */
-
 #define SEESAW_AZ_MIN_G                   (0.25f)//加速度 Z 轴最低分量，防止加速度模长可信但姿态已经倒置时误判。单位：g。
-#define SEESAW_GYRO_MOTION_MIN_DPS        (2.0f)//忽略小于该值的 gx 角速度。单位：度/秒；调大可滤振，调小更灵敏。
-#define SEESAW_GYRO_REVERSE_CONFIRM_SAMPLES (3U)// gx 反向连续确认帧数。当前 IMU 约 5 ms 一帧，3 帧约 15 ms。
 
 
 /* ---------- 连续帧和超时 ---------- */
@@ -70,7 +62,7 @@
 
 void Seesaw_Init(void);//上电初始化入口，内部清空本模块全部状态。
 void Seesaw_Reset(void);//重置本模块状态，恢复到 IDLE。
-uint8 Seesaw_ImuUpdate(const spatial_features_t *features, float pitch_deg);//主循环每收到一个新IMU特征帧调用一次；抬起pitch<0，下降pitch>0。
+uint8 Seesaw_ImuUpdate(const imu_sample_t *sample, float pitch_deg);//主循环每收到一个新IMU样本调用一次；抬起pitch<0，下降pitch>0。
 uint8 Seesaw_IsCandidate(void);//返回当前是否处于 RISING/FALLING 候选阶段。
 uint8 Seesaw_IsConfirmed(void);//返回是否已经完成峰值转折（ACTIVE 或 EXITED），可用于路线确认。
 uint8 Seesaw_HasExited(void);//返回是否已经连续回到平面。

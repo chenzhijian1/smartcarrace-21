@@ -1,4 +1,5 @@
 #include "wall.h"
+#include "spatial_features.h"
 
 static volatile uint8 wall_state = WALL_STATE_IDLE;
 static uint16 wall_baseline_count = 0;
@@ -80,24 +81,35 @@ int16 Wall_GetGravityFeedforwardPwm(void)
 }
 
 /*
- * 主循环每个去重后的 IMU 特征帧调用一次。
+ * 主循环每个去重后的 IMU 样本调用一次，直接使用当前 ax/ay/az。
  * 依次识别：平面基线 -> 上坡 -> 近竖直 -> 轮轴方向横向 -> 下坡 -> 回平。
  * 只更新状态和控制快照，不直接写电机或风机；返回非零表示候选仍存在。
  */
-uint8 Wall_ImuUpdate(const spatial_features_t *features, float pitch_deg)
+uint8 Wall_ImuUpdate(const imu_sample_t *sample, float pitch_deg)
 {
     uint8 climb_valid;
     uint8 vertical_valid;
     uint8 lateral_valid;
     uint8 descent_valid;
     uint8 exit_valid;
+    uint8 norm_valid;
+    uint8 flat;
+    uint8 inverted;
 
-    if (features == (const spatial_features_t *)0)
+    if (sample == (const imu_sample_t *)0)
         return 0;
+
+    norm_valid = spatial_accel_vector_norm_in_range(
+        sample->ax_g, sample->ay_g, sample->az_g,
+        SPATIAL_NORM_MIN_G, SPATIAL_NORM_MAX_G);
+    flat = (uint8)(norm_valid &&
+                   spatial_absf(sample->ay_g) <= SPATIAL_FLAT_AY_MAX_G &&
+                   sample->az_g >= SPATIAL_FLAT_AZ_MIN_G);
+    inverted = (uint8)(sample->az_g <= WALL_INVERTED_AZ_MAX_G);
 
     if (wall_state == WALL_STATE_IDLE)
     {
-        if (features->flat)
+        if (flat)
         {
             if (spatial_confirm_update(1,
                                        WALL_BASELINE_CONFIRM_SAMPLES,
@@ -118,7 +130,7 @@ uint8 Wall_ImuUpdate(const spatial_features_t *features, float pitch_deg)
         /* 与圆筒一致，使用euler.pitch<-5度确认上坡入口。 */
         climb_valid = (uint8)(
             wall_baseline_seen &&
-            features->norm_valid &&
+            norm_valid &&
             pitch_deg < WALL_ENTRY_PITCH_MAX_DEG);
 
         if (spatial_confirm_update(climb_valid,
@@ -149,7 +161,7 @@ uint8 Wall_ImuUpdate(const spatial_features_t *features, float pitch_deg)
         return 0;
     }
 
-    if (!features->norm_valid)
+    if (!norm_valid)
     {
         if (wall_norm_invalid_count < WALL_NORM_INVALID_GRACE_SAMPLES)
             wall_norm_invalid_count++;
@@ -162,8 +174,7 @@ uint8 Wall_ImuUpdate(const spatial_features_t *features, float pitch_deg)
     }
     wall_norm_invalid_count = 0;
 
-    if (features->az_lowpass_g <= WALL_INVERTED_AZ_MAX_G ||
-        features->inverted)
+    if (inverted)
     {
         /* 在回平前出现真正倒置更像圆筒翻转轨迹，不符合墙面模型。 */
         wall_clear_candidate();
@@ -171,20 +182,19 @@ uint8 Wall_ImuUpdate(const spatial_features_t *features, float pitch_deg)
     }
 
     vertical_valid = (uint8)(
-        features->ay_lowpass_g <= WALL_VERTICAL_AY_MAX_G &&
-        features->az_lowpass_g <= WALL_VERTICAL_AZ_MAX_G &&
-        features->az_lowpass_g > WALL_INVERTED_AZ_MAX_G &&
-        spatial_absf(features->ax_lowpass_g) <= WALL_VERTICAL_AX_MAX_G);
+        sample->ay_g <= WALL_VERTICAL_AY_MAX_G &&
+        sample->az_g <= WALL_VERTICAL_AZ_MAX_G &&
+        sample->az_g > WALL_INVERTED_AZ_MAX_G &&
+        spatial_absf(sample->ax_g) <= WALL_VERTICAL_AX_MAX_G);
 
     lateral_valid = (uint8)(
-        features->norm_valid &&
-        spatial_absf(features->ax_lowpass_g) >= WALL_LATERAL_AX_MIN_G &&
-        spatial_absf(features->ay_lowpass_g) <= WALL_LATERAL_AY_MAX_G &&
-        spatial_absf(features->az_lowpass_g) <= WALL_LATERAL_AZ_MAX_G);
+        spatial_absf(sample->ax_g) >= WALL_LATERAL_AX_MIN_G &&
+        spatial_absf(sample->ay_g) <= WALL_LATERAL_AY_MAX_G &&
+        spatial_absf(sample->az_g) <= WALL_LATERAL_AZ_MAX_G);
 
     if (wall_state == WALL_STATE_CLIMB_CANDIDATE)
     {
-        if (features->flat)
+        if (flat)
         {
             /* 车辆在确认墙面前已经回到地面，撤销本次墙面候选。 */
             wall_clear_candidate();
@@ -205,7 +215,7 @@ uint8 Wall_ImuUpdate(const spatial_features_t *features, float pitch_deg)
 
     if (wall_state == WALL_STATE_VERTICAL_PROVISIONAL)
     {
-        if (features->flat)
+        if (flat)
         {
             wall_clear_candidate();
             return 0;
@@ -217,7 +227,7 @@ uint8 Wall_ImuUpdate(const spatial_features_t *features, float pitch_deg)
         {
             wall_state = WALL_STATE_LATERAL;
             wall_lateral_seen = 1;
-            wall_lateral_side = features->ax_lowpass_g >= 0.0f ? 1 : -1;
+            wall_lateral_side = sample->ax_g >= 0.0f ? 1 : -1;
             wall_lateral_count = 0;
             wall_descent_count = 0;
         }
@@ -228,9 +238,9 @@ uint8 Wall_ImuUpdate(const spatial_features_t *features, float pitch_deg)
     {
         descent_valid = (uint8)(
             wall_lateral_seen &&
-            features->ay_lowpass_g >= WALL_DESCENT_AY_MIN_G &&
-            spatial_absf(features->ax_lowpass_g) <= WALL_DESCENT_AX_MAX_G &&
-            features->az_lowpass_g > WALL_INVERTED_AZ_MAX_G);
+            sample->ay_g >= WALL_DESCENT_AY_MIN_G &&
+            spatial_absf(sample->ax_g) <= WALL_DESCENT_AX_MAX_G &&
+            sample->az_g > WALL_INVERTED_AZ_MAX_G);
 
         if (spatial_confirm_update(descent_valid,
                                    WALL_DESCENT_CONFIRM_SAMPLES,
@@ -240,7 +250,7 @@ uint8 Wall_ImuUpdate(const spatial_features_t *features, float pitch_deg)
             wall_descent_count = 0;
             wall_exit_count = 0;
         }
-        else if (features->flat && wall_lateral_seen)
+        else if (flat && wall_lateral_seen)
         {
             /* 对很短或有噪声的下坡过渡提供后备判断：一旦轮轴重力确认墙面，
              * 稳定回到地面就足以释放墙面控制。 */
@@ -260,13 +270,7 @@ uint8 Wall_ImuUpdate(const spatial_features_t *features, float pitch_deg)
     }
 
     /* 只有经过横向阶段后的下坡流程才能声明墙面完成。 */
-    exit_valid = (uint8)(
-        wall_lateral_seen &&
-        features->flat &&
-        features->ay_lowpass_g <= WALL_EXIT_AY_MAX_G &&
-        features->ay_lowpass_g >= -WALL_EXIT_AY_MAX_G &&
-        features->az_lowpass_g >= WALL_EXIT_AZ_MIN_G &&
-        !features->inverted);
+    exit_valid = (uint8)(wall_lateral_seen && flat);
 
     if (spatial_confirm_update(exit_valid,
                                WALL_EXIT_CONFIRM_SAMPLES,
