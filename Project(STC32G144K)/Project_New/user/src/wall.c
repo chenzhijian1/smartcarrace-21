@@ -42,12 +42,6 @@ void Wall_Reset(void)
     Wall_UpdateGravityFeedforward(0.0f);
 }
 
-/* 上电初始化包装函数；实际复位工作由 Wall_Reset() 完成。 */
-void Wall_Init(void)
-{
-    Wall_Reset();
-}
-
 void Wall_UpdateGravityFeedforward(float pitch_sin)
 {
     uint8 next_index;
@@ -83,9 +77,9 @@ int16 Wall_GetGravityFeedforwardPwm(void)
 /*
  * 主循环每个去重后的 IMU 样本调用一次，直接使用当前 ax/ay/az。
  * 依次识别：平面基线 -> 上坡 -> 近竖直 -> 轮轴方向横向 -> 下坡 -> 回平。
- * 只更新状态和控制快照，不直接写电机或风机；返回非零表示候选仍存在。
+ * 只更新状态和控制快照，不直接写电机或风机。
  */
-uint8 Wall_ImuUpdate(const imu_sample_t *sample, float pitch_deg)
+void Wall_ImuUpdate(const imu_sample_t *sample, float pitch_deg)
 {
     uint8 climb_valid;
     uint8 vertical_valid;
@@ -97,7 +91,7 @@ uint8 Wall_ImuUpdate(const imu_sample_t *sample, float pitch_deg)
     uint8 inverted;
 
     if (sample == (const imu_sample_t *)0)
-        return 0;
+        return;
 
     norm_valid = spatial_accel_vector_norm_in_range(
         sample->ax_g, sample->ay_g, sample->az_g,
@@ -146,11 +140,11 @@ uint8 Wall_ImuUpdate(const imu_sample_t *sample, float pitch_deg)
             wall_climb_count = 0;
         }
 
-        return (uint8)(wall_state != WALL_STATE_IDLE);
+        return;
     }
 
     if (wall_state == WALL_STATE_EXITED)
-        return 1;
+        return;
 
     if (wall_candidate_age < 65535U)
         wall_candidate_age++;
@@ -158,7 +152,7 @@ uint8 Wall_ImuUpdate(const imu_sample_t *sample, float pitch_deg)
     if (wall_candidate_age > WALL_MAX_CANDIDATE_SAMPLES)
     {
         wall_clear_candidate();
-        return 0;
+        return;
     }
 
     if (!norm_valid)
@@ -168,9 +162,9 @@ uint8 Wall_ImuUpdate(const imu_sample_t *sample, float pitch_deg)
         if (wall_norm_invalid_count >= WALL_NORM_INVALID_GRACE_SAMPLES)
         {
             wall_clear_candidate();
-            return 0;
+            return;
         }
-        return 1;
+        return;
     }
     wall_norm_invalid_count = 0;
 
@@ -178,7 +172,7 @@ uint8 Wall_ImuUpdate(const imu_sample_t *sample, float pitch_deg)
     {
         /* 在回平前出现真正倒置更像圆筒翻转轨迹，不符合墙面模型。 */
         wall_clear_candidate();
-        return 0;
+        return;
     }
 
     vertical_valid = (uint8)(
@@ -198,7 +192,7 @@ uint8 Wall_ImuUpdate(const imu_sample_t *sample, float pitch_deg)
         {
             /* 车辆在确认墙面前已经回到地面，撤销本次墙面候选。 */
             wall_clear_candidate();
-            return 0;
+            return;
         }
 
         if (spatial_confirm_update(vertical_valid,
@@ -210,7 +204,7 @@ uint8 Wall_ImuUpdate(const imu_sample_t *sample, float pitch_deg)
             wall_vertical_count = 0;
             wall_lateral_count = 0;
         }
-        return 1;
+        return;
     }
 
     if (wall_state == WALL_STATE_VERTICAL_PROVISIONAL)
@@ -218,7 +212,7 @@ uint8 Wall_ImuUpdate(const imu_sample_t *sample, float pitch_deg)
         if (flat)
         {
             wall_clear_candidate();
-            return 0;
+            return;
         }
 
         if (spatial_confirm_update(lateral_valid,
@@ -231,7 +225,7 @@ uint8 Wall_ImuUpdate(const imu_sample_t *sample, float pitch_deg)
             wall_lateral_count = 0;
             wall_descent_count = 0;
         }
-        return 1;
+        return;
     }
 
     if (wall_state == WALL_STATE_LATERAL)
@@ -266,7 +260,7 @@ uint8 Wall_ImuUpdate(const imu_sample_t *sample, float pitch_deg)
         {
             wall_exit_count = 0;
         }
-        return 1;
+        return;
     }
 
     /* 只有经过横向阶段后的下坡流程才能声明墙面完成。 */
@@ -284,7 +278,6 @@ uint8 Wall_ImuUpdate(const imu_sample_t *sample, float pitch_deg)
         wall_exit_count = 0;
     }
 
-    return 1;
 }
 
 /* 返回墙面进行中的四个阶段；LATERAL/DESCENT 已有较强身份依据但未退出。 */
@@ -294,14 +287,6 @@ uint8 Wall_IsCandidate(void)
                    wall_state == WALL_STATE_VERTICAL_PROVISIONAL ||
                    wall_state == WALL_STATE_LATERAL ||
                    wall_state == WALL_STATE_DESCENT);
-}
-
-/* 看到轮轴方向重力后确认墙面，供元素管理器提交该路线元素。 */
-uint8 Wall_IsConfirmed(void)
-{
-    return (uint8)(wall_state == WALL_STATE_LATERAL ||
-                   wall_state == WALL_STATE_DESCENT ||
-                   wall_state == WALL_STATE_EXITED);
 }
 
 /* 仅在 EXITED 时返回 1，供元素管理器释放墙面控制并推进路线。 */

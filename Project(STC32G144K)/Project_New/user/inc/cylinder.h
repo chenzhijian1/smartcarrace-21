@@ -68,11 +68,9 @@
 #define CYLINDER_STATE_ON_CYLINDER          (2U) /* 已上筒，正在累计运动证据 */
 #define CYLINDER_STATE_EXIT_STRAIGHT        (3U) /* 接近/离开出口的保护直道 */
 
-void Cylinder_Init(void);
-
 /* ---------- 入口ADC与IMU状态更新 ---------- */
 /* 消费direction_adc_get()刚刚更新的ad_ave[]，不引入额外电感帧结构。 */
-uint8 Cylinder_AdcUpdate(void);
+void Cylinder_AdcUpdate(void);
 uint8 Cylinder_ImuUpdate(float ay_g, float az_g,
                          float gyro_x_dps, float pitch_deg);
 

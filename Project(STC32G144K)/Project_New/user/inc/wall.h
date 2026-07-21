@@ -76,12 +76,10 @@
 
 
 
-void Wall_Init(void);//上电初始化入口，内部清空本模块全部状态。
 void Wall_Reset(void);//重置本模块状态，恢复到 IDLE。
-uint8 Wall_ImuUpdate(const imu_sample_t *sample,
-                     float pitch_deg);//主循环每收到一个新IMU样本调用一次，使用与圆筒相同的pitch入口条件。
+void Wall_ImuUpdate(const imu_sample_t *sample,
+                    float pitch_deg);//主循环每收到一个新IMU样本调用一次，使用与圆筒相同的pitch入口条件。
 uint8 Wall_IsCandidate(void);//上坡、近竖直、横向或下坡进行中返回1，EXITED不再算候选。
-uint8 Wall_IsConfirmed(void);//看到轮轴方向重力后返回1，用于元素管理器正式确认墙面。
 uint8 Wall_HasExited(void);//连续回到平面并进入 EXITED 后返回1。
 uint8 Wall_GetState(void);//返回当前墙面状态，供控制中断、元素管理器和调试打印读取。
 

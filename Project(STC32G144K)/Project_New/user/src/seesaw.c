@@ -99,19 +99,9 @@ void Seesaw_Reset(void)
 }
 
 /**
- * @brief  上电初始化入口，内部调用 Seesaw_Reset() 完成全部复位。
- * @note   应在系统启动时调用一次，确保模块从干净状态开始运行。
- */
-void Seesaw_Init(void)
-{
-    Seesaw_Reset();
-}
-
-/**
  * @brief  主循环跷跷板状态机入口，每个去重后的 IMU 样本调用一次。
  * @param  sample    当前 IMU 样本指针（不可为 NULL）。
  * @param  pitch_deg 姿态解算俯仰角，单位度。
- * @return 当前状态非 IDLE 时返回 1，IDLE 时返回 0。
  *
  * ## 状态机说明
  *
@@ -147,7 +137,7 @@ void Seesaw_Init(void)
  *          速度限制由 Seesaw_GetSpeedTarget() 和 Seesaw_ClampWheelTargets()
  *          在 TIM4 中断中根据状态机状态独立执行。
  */
-uint8 Seesaw_ImuUpdate(const imu_sample_t *sample, float pitch_deg)
+void Seesaw_ImuUpdate(const imu_sample_t *sample, float pitch_deg)
 {
     float tilt_deg;      /* 负pitch对应的抬起角度幅值，单位度 */
     uint8 tilt_valid;    /* 上坡条件是否满足 */
@@ -158,7 +148,7 @@ uint8 Seesaw_ImuUpdate(const imu_sample_t *sample, float pitch_deg)
 
     /* 空指针保护 */
     if (sample == (const imu_sample_t *)0)
-        return 0;
+        return;
 
     norm_valid = spatial_accel_vector_norm_in_range(
         sample->ax_g, sample->ay_g, sample->az_g,
@@ -230,14 +220,12 @@ uint8 Seesaw_ImuUpdate(const imu_sample_t *sample, float pitch_deg)
             seesaw_enter_count = 0;
         }
 
-        return (uint8)(seesaw_state != SEESAW_STATE_IDLE);
+        return;
     }
 
-    /* ==================================================================
-     * EXITED 状态：已结束，维持返回 1
-     * ================================================================== */
+    /* EXITED 状态等待元素管理器推进路线。 */
     if (seesaw_state == SEESAW_STATE_EXITED)
-        return 1;
+        return;
 
     /* ==================================================================
      * 候选存活期通用检查（RISING / FALLING / ACTIVE）
@@ -252,7 +240,7 @@ uint8 Seesaw_ImuUpdate(const imu_sample_t *sample, float pitch_deg)
         inverted)
     {
         seesaw_clear_candidate();
-        return 0;
+        return;
     }
 
     /* 加速度模长无效容错 */
@@ -266,10 +254,10 @@ uint8 Seesaw_ImuUpdate(const imu_sample_t *sample, float pitch_deg)
         {
             /* 连续无效帧数超过宽限期，撤销候选 */
             seesaw_clear_candidate();
-            return 0;
+            return;
         }
         /* 宽限期内保持候选，但不更新状态 */
-        return 1;
+        return;
     }
     seesaw_norm_invalid_count = 0;  /* 模长恢复正常，清零计数器 */
 
@@ -280,7 +268,7 @@ uint8 Seesaw_ImuUpdate(const imu_sample_t *sample, float pitch_deg)
         sample->az_g < SEESAW_AZ_MIN_G)
     {
         seesaw_clear_candidate();
-        return 0;
+        return;
     }
 
     /* 更新峰值倾角 */
@@ -315,7 +303,7 @@ uint8 Seesaw_ImuUpdate(const imu_sample_t *sample, float pitch_deg)
             seesaw_peak_tilt_deg < SEESAW_TILT_MIN_PEAK_DEG)
         {
             seesaw_clear_candidate();
-            return 0;
+            return;
         }
 
         /*
@@ -363,31 +351,6 @@ uint8 Seesaw_ImuUpdate(const imu_sample_t *sample, float pitch_deg)
         }
     }
 
-    return (uint8)(seesaw_state != SEESAW_STATE_IDLE);
-}
-
-/**
- * @brief  判断当前是否处于候选阶段（RISING 或 FALLING）。
- * @return 1 表示处于候选阶段，0 表示不是。
- * @note   供元素管理器保存候选并触发低速保护。
- *          候选阶段表示已检测到上坡但尚未确认完整的跷跷板轨迹。
- */
-uint8 Seesaw_IsCandidate(void)
-{
-    return (uint8)(seesaw_state == SEESAW_STATE_RISING ||
-                   seesaw_state == SEESAW_STATE_FALLING);
-}
-
-/**
- * @brief  判断是否已确认完成有效的跷跷板转折轨迹。
- * @return 1 表示已确认（ACTIVE 或 EXITED），0 表示未确认。
- * @note   返回 1 表示检测到完整的"上坡→峰值→下坡"过程，
- *          可用于路线确认和元素计数。
- */
-uint8 Seesaw_IsConfirmed(void)
-{
-    return (uint8)(seesaw_state == SEESAW_STATE_ACTIVE ||
-                   seesaw_state == SEESAW_STATE_EXITED);
 }
 
 /**

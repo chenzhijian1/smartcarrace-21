@@ -172,12 +172,7 @@ static void cylinder_try_auto_rearm(void)
 #endif
 }
 
-void Cylinder_Init(void)
-{
-    Cylinder_Reset();
-}
-
-uint8 Cylinder_AdcUpdate(void)
+void Cylinder_AdcUpdate(void)
 {
     uint8 entry_signal_present;
 
@@ -187,21 +182,20 @@ uint8 Cylinder_AdcUpdate(void)
     if (cylinder_entry_lockout)
     {
         cylinder_update_entry_lockout(entry_signal_present);
-        return 0;
+        return;
     }
 #endif
 
     if (cylinder_state != CYLINDER_STATE_IDLE)
-        return 1;
+        return;
 
     if (!spatial_confirm_update(entry_signal_present,
                                 CYLINDER_DETECT_CONFIRM_SAMPLES,
                                 &cylinder_detect_count))
-        return 0;
+        return;
 
     cylinder_state = CYLINDER_STATE_PRE_ENTRY;
     cylinder_left_guard_active = 1;
-    return 1;
 }
 
 uint8 Cylinder_EntryIsDetected(void)

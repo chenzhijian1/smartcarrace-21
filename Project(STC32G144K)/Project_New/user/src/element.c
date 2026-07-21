@@ -142,17 +142,16 @@ static void element_complete(element_type_t completed_type)
 
 void Element_Init(void)
 {
-    Seesaw_Init();
-    Cylinder_Init();
+    Seesaw_Reset();
+    Cylinder_Reset();
     Huandao_DetectReset();
-    Wall_Init();
+    Wall_Reset();
 
     element_route_index = 0;
     element_current_type = (uint8)element_route[0];
     element_cylinder_fan_boosted = 0;
     element_cylinder_fan_applied_pwm = 0;
     motor_set_feedforward_pwm(0);
-    element_reset_type((element_type_t)element_current_type);
 }
 
 void Element_ImuUpdate(const imu_sample_t *sample)
@@ -165,7 +164,7 @@ void Element_ImuUpdate(const imu_sample_t *sample)
     switch ((element_type_t)element_current_type)
     {
         case ELEMENT_SEESAW:
-            (void)Seesaw_ImuUpdate(sample, euler.pitch);
+            Seesaw_ImuUpdate(sample, euler.pitch);
             if (Seesaw_HasExited())
                 element_complete(ELEMENT_SEESAW);
             break;
@@ -186,7 +185,7 @@ void Element_ImuUpdate(const imu_sample_t *sample)
             break;
 
         case ELEMENT_WALL:
-            (void)Wall_ImuUpdate(sample, euler.pitch);
+            Wall_ImuUpdate(sample, euler.pitch);
             if (Wall_HasExited())
                 element_complete(ELEMENT_WALL);
             break;
@@ -202,7 +201,7 @@ uint8 Element_AdcUpdate(void)
 {
     if ((element_type_t)element_current_type == ELEMENT_CYLINDER)
     {
-        (void)Cylinder_AdcUpdate();
+        Cylinder_AdcUpdate();
         return 0;
     }
 
@@ -265,9 +264,4 @@ element_type_t Element_GetCurrent(void)
 uint8 Element_GetRouteIndex(void)
 {
     return element_route_index;
-}
-
-uint8 Element_GetRouteCount(void)
-{
-    return ELEMENT_ROUTE_COUNT;
 }

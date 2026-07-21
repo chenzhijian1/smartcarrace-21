@@ -60,11 +60,8 @@
 
 
 
-void Seesaw_Init(void);//上电初始化入口，内部清空本模块全部状态。
 void Seesaw_Reset(void);//重置本模块状态，恢复到 IDLE。
-uint8 Seesaw_ImuUpdate(const imu_sample_t *sample, float pitch_deg);//主循环每收到一个新IMU样本调用一次；抬起pitch<0，下降pitch>0。
-uint8 Seesaw_IsCandidate(void);//返回当前是否处于 RISING/FALLING 候选阶段。
-uint8 Seesaw_IsConfirmed(void);//返回是否已经完成峰值转折（ACTIVE 或 EXITED），可用于路线确认。
+void Seesaw_ImuUpdate(const imu_sample_t *sample, float pitch_deg);//主循环每收到一个新IMU样本调用一次；抬起pitch<0，下降pitch>0。
 uint8 Seesaw_HasExited(void);//返回是否已经连续回到平面。
 uint8 Seesaw_GetState(void);//返回当前状态。
 
