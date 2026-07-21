@@ -15,7 +15,8 @@ void uart_telemetry_print(void)
             printf("%d,", flag);
             printf("%d,%d,", motor_left.setspeed, motor_left.encoder_data);
             printf("%d,", motor_left.duty1);
-            // printf("%d,%d,", motor_right.setspeed, motor_right.encoder_data);
+             printf("%d,%d,", motor_right.setspeed, motor_right.encoder_data);
+             printf("%d,", motor_right.duty1);
             printf("%d,%.1f,", normal_speed, encoder_ave);
             printf("%.2f,", aaddcc.err_dir);
             printf("%d\r\n", voltage_battery_get_mv());
