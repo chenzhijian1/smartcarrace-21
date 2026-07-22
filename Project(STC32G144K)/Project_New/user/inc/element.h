@@ -29,5 +29,6 @@ uint8 Element_GetRouteIndex(void);
 uint8 Element_GetRouteCount(void);
 
 extern uint16 suction_fan_pwm_cylinder;
+extern uint16 suction_fan_pwm_wall;
 
 #endif

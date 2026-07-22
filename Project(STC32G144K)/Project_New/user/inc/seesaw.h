@@ -18,25 +18,21 @@
 
 /* ---------- 姿态识别阈值 ---------- */
 
-#define SEESAW_TILT_ENTER_DEG             (3.0f)  // 抬起需 pitch<=-3°；下降需 pitch>=+3°。
-#define SEESAW_TILT_MIN_PEAK_DEG          (8.0f)  // 抬起阶段 |-pitch| 至少达到 8°。
-#define SEESAW_TILT_MAX_DEG               (40.0f) // |pitch| 超过 40°时撤销跷跷板候选。
-
-#define SEESAW_AZ_MIN_G                   (0.25f)//加速度 Z 轴最低分量，防止加速度模长可信但姿态已经倒置时误判。单位：g。
+#define SEESAW_TILT_ENTER_DEG             (12.0f)  // 入口需 pitch<=-7°；进入候选后 pitch>0° 即完成。
+#define SEESAW_TILT_MIN_PEAK_DEG          (15.0f) // 回平误触判断使用的最小负pitch峰值。
+#define SEESAW_TILT_MAX_DEG               (90.0f) // |pitch| 超过90°时撤销跷跷板候选。
 
 
 /* ---------- 连续帧和超时 ---------- */
-#define SEESAW_BASELINE_CONFIRM_SAMPLES   (5U)//平面起始姿态连续确认帧数。没有基线时不接受倾角候选。
-#define SEESAW_ENTER_CONFIRM_SAMPLES      (5U)//负 pitch 抬起连续确认帧数，决定何时进入 RISING。
-#define SEESAW_TREND_CONFIRM_SAMPLES      (3U)//正 pitch 下降连续确认帧数，用于确认 FALLING/ACTIVE。
-#define SEESAW_EXIT_CONFIRM_SAMPLES       (3U)//回到平面连续确认帧数，决定何时进入 EXITED。
-#define SEESAW_MAX_CANDIDATE_SAMPLES      (10U)//候选最长持续时间：10 帧约等于 50 ms（按 5 ms/帧估算）。
-#define SEESAW_NORM_INVALID_GRACE_SAMPLES (5U)//加速度模长短暂超出 0.85～1.15 g 时允许保留候选的帧数。
+#define SEESAW_BASELINE_CONFIRM_SAMPLES   (3U)//平面起始姿态连续确认帧数。没有基线时不接受倾角候选。
+#define SEESAW_ENTER_CONFIRM_SAMPLES      (2U)//负 pitch 抬起连续确认帧数，决定何时进入 RISING。
+#define SEESAW_MAX_CANDIDATE_SAMPLES      (20U)//候选最长：20帧，超时直接判定元素通过
+
 
 /* ---------- 第二种速度策略 ---------- */
 /* RISING 阶段的整车目标上限，占普通直线目标的百分比，不是 PWM。
 调小更慢、更容易等待板子落下，但可能无法越过支点；调大更快。 */
-#define SEESAW_SPEED_SLOW_PERCENT         (60U)
+#define SEESAW_SPEED_SLOW_PERCENT         (75U)
 
 
 
@@ -53,9 +49,7 @@
 /* ---------- 状态机状态 ---------- */
 #define SEESAW_STATE_IDLE                 (0U)//未看到有效上坡。
 #define SEESAW_STATE_RISING               (1U)//已确认登板并正在上升，此时执行低速等待策略。
-#define SEESAW_STATE_FALLING              (2U)//已确认姿态从上升转为下降，此时释放低速限制。
-#define SEESAW_STATE_ACTIVE               (3U)//已确认跷跷板轨迹，但还没有稳定回到平面。
-#define SEESAW_STATE_EXITED               (4U)//已连续回平，本次跷跷板元素结束。
+#define SEESAW_STATE_EXITED               (4U)//pitch转正或候选超时，本次跷跷板元素结束。
 
 
 
@@ -63,9 +57,9 @@
 void Seesaw_Init(void);//上电初始化入口，内部清空本模块全部状态。
 void Seesaw_Reset(void);//重置本模块状态，恢复到 IDLE。
 uint8 Seesaw_ImuUpdate(const imu_sample_t *sample, float pitch_deg);//主循环每收到一个新IMU样本调用一次；抬起pitch<0，下降pitch>0。
-uint8 Seesaw_IsCandidate(void);//返回当前是否处于 RISING/FALLING 候选阶段。
-uint8 Seesaw_IsConfirmed(void);//返回是否已经完成峰值转折（ACTIVE 或 EXITED），可用于路线确认。
-uint8 Seesaw_HasExited(void);//返回是否已经连续回到平面。
+uint8 Seesaw_IsCandidate(void);//返回当前是否处于 RISING 候选阶段。
+uint8 Seesaw_IsConfirmed(void);//返回是否已经判定本次跷跷板通过。
+uint8 Seesaw_HasExited(void);//返回是否已通过跷跷板并释放路线。
 uint8 Seesaw_GetState(void);//返回当前状态。
 
 int16 Seesaw_GetSpeedTarget(int16 current_speed, int16 straight_speed);//供 TIM4 速度控制中断调用：RISING 时限制当前目标，其他状态原样返回。

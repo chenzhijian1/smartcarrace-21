@@ -38,7 +38,7 @@ void TM0_IRQHandler(void) interrupt TMR0_VECTOR
     
     pit_callback();
 
-    if (++adc_tick >= 2)
+    if (++adc_tick >= 1)
     {
         adc_tick = 0;
         flag_adc = 1;
@@ -87,8 +87,8 @@ void TM4_IRQHandler(void) interrupt TMR4_VECTOR
 
     if (car_stop_judge() || voltage_battery_is_low() || (normal_speed == 0 && flag != 5))
     {
-        suction_fan_off();
-        motor_control_stop();
+       suction_fan_off();
+       motor_control_stop();
     }
     else if (flag == 4)
     {

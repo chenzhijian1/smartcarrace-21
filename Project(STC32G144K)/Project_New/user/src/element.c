@@ -12,20 +12,87 @@ static const element_type_t element_route[] =
 {
   //  ELEMENT_SEESAW,
   //  ELEMENT_CYLINDER,
-    ELEMENT_HUANDAO,
-    ELEMENT_HUANDAO,
-    ELEMENT_HUANDAO,
-    ELEMENT_HUANDAO,
-    ELEMENT_HUANDAO,
-    ELEMENT_HUANDAO,
-    ELEMENT_HUANDAO,
-    ELEMENT_HUANDAO,
-    ELEMENT_HUANDAO,
-    ELEMENT_HUANDAO,
-    ELEMENT_HUANDAO,
-    ELEMENT_HUANDAO,
-    ELEMENT_HUANDAO,
-    
+ELEMENT_SEESAW,
+ELEMENT_CYLINDER,
+ELEMENT_HUANDAO,
+ELEMENT_WALL,
+ELEMENT_SEESAW,
+ELEMENT_CYLINDER,
+ELEMENT_HUANDAO,
+ELEMENT_WALL,
+ELEMENT_SEESAW,
+ELEMENT_CYLINDER,
+ELEMENT_HUANDAO,
+ELEMENT_WALL,
+ELEMENT_SEESAW,
+ELEMENT_CYLINDER,
+ELEMENT_HUANDAO,
+ELEMENT_WALL,
+ELEMENT_SEESAW,
+ELEMENT_CYLINDER,
+ELEMENT_HUANDAO,
+ELEMENT_WALL,
+ELEMENT_SEESAW,
+ELEMENT_CYLINDER,
+ELEMENT_HUANDAO,
+ELEMENT_WALL,
+ELEMENT_SEESAW,
+ELEMENT_CYLINDER,
+ELEMENT_HUANDAO,
+ELEMENT_WALL,
+ELEMENT_SEESAW,
+ELEMENT_CYLINDER,
+ELEMENT_HUANDAO,
+ELEMENT_WALL,
+ELEMENT_SEESAW,
+ELEMENT_CYLINDER,
+ELEMENT_HUANDAO,
+ELEMENT_WALL,
+ELEMENT_SEESAW,
+ELEMENT_CYLINDER,
+ELEMENT_HUANDAO,
+ELEMENT_WALL,
+
+
+
+  /*
+ELEMENT_SEESAW,
+ELEMENT_CYLINDER,
+ELEMENT_HUANDAO,
+ELEMENT_WALL,
+ELEMENT_SEESAW,
+ELEMENT_CYLINDER,
+ELEMENT_HUANDAO,
+ELEMENT_WALL,
+ELEMENT_SEESAW,
+ELEMENT_CYLINDER,
+ELEMENT_HUANDAO,
+ELEMENT_WALL,
+ELEMENT_SEESAW,
+ELEMENT_CYLINDER,
+ELEMENT_HUANDAO,
+ELEMENT_WALL,
+ELEMENT_SEESAW,
+ELEMENT_CYLINDER,
+ELEMENT_HUANDAO,
+ELEMENT_WALL,
+ELEMENT_SEESAW,
+ELEMENT_CYLINDER,
+ELEMENT_HUANDAO,
+ELEMENT_WALL,
+ELEMENT_SEESAW,
+ELEMENT_CYLINDER,
+ELEMENT_HUANDAO,
+ELEMENT_WALL,
+ELEMENT_SEESAW,
+ELEMENT_CYLINDER,
+ELEMENT_HUANDAO,
+ELEMENT_WALL,
+ELEMENT_SEESAW,
+ELEMENT_CYLINDER,
+ELEMENT_HUANDAO,
+ELEMENT_WALL,
+    */
 
  //   ELEMENT_WALL,
 };
@@ -38,9 +105,13 @@ static volatile uint8 element_current_type = ELEMENT_DONE;   // 当前活跃的�
 static uint8 element_cylinder_fan_boosted = 0;               // 圆柱体风扇是否已提升功率的标志
 static uint16 element_cylinder_fan_applied_pwm = 0;          // 圆柱体风扇当前实际应用的PWM值
 
-uint16 suction_fan_pwm_cylinder = 10000;                     // 圆柱体吸风风扇目标PWM（默认满功率10000）
+uint16 suction_fan_pwm_cylinder = 6800;                     // 圆柱体吸风风扇目标PWM（默认满功率10000）
 
 /* 判断是否允许重力前馈补偿：电池电压低或调试模式(flag==4)时禁止，停车时也禁止（紧急停止flag==5除外）。 */
+static uint8 element_wall_fan_boosted = 0;
+static uint16 element_wall_fan_applied_pwm = 0;
+uint16 suction_fan_pwm_wall = 7200;
+
 static uint8 element_feedforward_is_allowed(void)
 {
     if (voltage_battery_is_low() || flag == 4)
@@ -115,6 +186,35 @@ static void element_update_cylinder_fan(uint8 on_surface)
 }
 
 /* 重置指定立体元素模块的状态并清零前馈PWM，在进入新元素或完成元素时调用。 */
+/* Mirror the cylinder fan boost policy after the wall is confirmed. */
+static void element_update_wall_fan(uint8 on_surface)
+{
+    if (on_surface && !element_wall_fan_boosted)
+    {
+        if (pwm_fan == 0 || flag_suction_fan_off)
+            return;
+
+        element_wall_fan_boosted = 1;
+        element_wall_fan_applied_pwm = suction_fan_pwm_wall;
+        if (suction_fan_pwm_wall == 0)
+            suction_fan_off();
+        else
+            suction_fan_on(suction_fan_pwm_wall);
+    }
+    else if (!on_surface && element_wall_fan_boosted)
+    {
+        element_wall_fan_boosted = 0;
+
+        if (pwm_fan != element_wall_fan_applied_pwm ||
+            flag_suction_fan_off || voltage_battery_is_low() ||
+            (normal_speed == 0 && flag != 5))
+            return;
+
+        suction_fan_on(suction_fan_pwm_start);
+        element_wall_fan_applied_pwm = 0;
+    }
+}
+
 static void element_reset_type(element_type_t type)
 {
     motor_set_feedforward_pwm(0);
@@ -171,6 +271,8 @@ void Element_Init(void)
     element_current_type = (uint8)element_route[0];
     element_cylinder_fan_boosted = 0;
     element_cylinder_fan_applied_pwm = 0;
+    element_wall_fan_boosted = 0;
+    element_wall_fan_applied_pwm = 0;
     motor_set_feedforward_pwm(0);
     element_reset_type((element_type_t)element_current_type);
 }
@@ -179,6 +281,7 @@ void Element_Init(void)
 void Element_ImuUpdate(const imu_sample_t *sample)
 {
     uint8 cylinder_on_surface;
+    uint8 wall_on_surface;
 
     if (sample == (const imu_sample_t *)0)
         return;
@@ -207,7 +310,10 @@ void Element_ImuUpdate(const imu_sample_t *sample)
             break;
 
         case ELEMENT_WALL:
-            (void)Wall_ImuUpdate(sample, euler.pitch);
+            (void)Wall_ImuUpdate(sample, euler.pitch, euler.roll);
+            wall_on_surface = (uint8)(Wall_IsConfirmed() &&
+                                      !Wall_HasExited());
+            element_update_wall_fan(wall_on_surface);
             if (Wall_HasExited())
                 element_complete(ELEMENT_WALL);
             break;

@@ -66,6 +66,37 @@ void uart_telemetry_print(void)
                    suction_fan_pwm_cylinder);
             printf("%d\r\n", motor_get_feedforward_pwm());
             break;
+        case 6:
+            printf("%u,%u,%u,%u\r\n",
+                   Wall_GetState(), huandao_detect_state, flag,
+                   voltage_battery_get_mv());
+                   /*第一列 Wall：0空闲、1上坡、2近竖直、3横向、4下坡、5退出
+                    第二列环岛识别：0正常、1疑似、2确认、3等待重置
+                    第三列环岛控制：0普通、1预入环、2入环、3环内、7出环
+                    第四列电池电压，单位 mV */
+            break;
+        case 7:
+            printf("%u,%u,%u,%u,%u\r\n",
+                    Seesaw_GetState(), 
+                    Wall_GetState(),
+                    Cylinder_GetState(),
+                    huandao_detect_state, 
+                   //flag,
+                   voltage_battery_get_mv());
+                   /*第一列 Seesaw：0空闲、1抬起、2下降、3活动、4退出
+                    第二列 Cylinder：0空闲、1入口、2桶面、3退出
+                    第三列 环岛识别：0正常、1疑似、2确认、3等待重置
+                    第四列 Wall：0空闲、1上坡、2近竖直、3横向、4下坡、5退出
+                    第五列环岛控制：0普通、1预入环、2入环、3环内、7出环
+                    第六列电池电压，单位 mV */
+            break;
+            case 8:
+                printf("%u,%.2f,%u\r\n",
+                    Seesaw_GetState(), 
+                    euler.pitch,
+                 voltage_battery_get_mv()
+                );
+                break;
         default:
             uart_output_mode = 0;
             break;
@@ -113,9 +144,13 @@ void main(void)
     // Config_Init();
     // Huandao_Init();
     // CarControl_Init();
+    /*
+while(1)
+{
+     motor_left_control(2000);
+     motor_right_control(2000);
+}*/
 
-    // motor_left_control(2000);
-    // motor_right_control(2000);
 
     normal_speed = 0;
 

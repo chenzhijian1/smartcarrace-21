@@ -10,7 +10,7 @@
 #define CYLINDER_DETECT_OUTER_SUM_MIN       (3800U) /* 两只横向电感之和下限 */
 #define CYLINDER_DETECT_TOTAL_SUM_MIN       (4200U) /* 四只电感之和下限 */
 #define CYLINDER_DETECT_OUTER_SINGLE_MIN    (1100U) /* 每只横向电感各自的下限 */
-#define CYLINDER_DETECT_CONFIRM_SAMPLES     (8U)    /* 连续8个ADC帧，约80ms */
+#define CYLINDER_DETECT_CONFIRM_SAMPLES     (4U)    /* 4帧约6cm */
 
 /*
  * 从圆筒右侧进入时的PRE_ENTRY差速限制。
@@ -24,12 +24,12 @@
 #define CYLINDER_GRAVITY_FF_PWM                (1600.0f)//圆筒重力前馈
 #define CYLINDER_SATURATION_PWM_THRESHOLD      (9500)
 #define CYLINDER_SATURATION_ERROR_THRESHOLD    (80)
-#define CYLINDER_SATURATION_CONFIRM_TICKS      (20U)
-#define CYLINDER_SATURATION_DIFF_PERCENT       (50L)
+#define CYLINDER_SATURATION_CONFIRM_TICKS      (4U)
+#define CYLINDER_SATURATION_DIFF_PERCENT       (90L)
 
 /* 开始登筒：车辆pitch连续小于-5度。 */
 #define CYLINDER_ENTRY_PITCH_MAX_DEG          (-5.0f)
-#define CYLINDER_CLIMB_CONFIRM_SAMPLES       (5U)     /* 约25ms */
+#define CYLINDER_CLIMB_CONFIRM_SAMPLES       (3U)     /* 5帧约7.5cm */
 
 /* 不依赖陀螺积分的后备位置特征：顶部az为负，后半圈ay为正。 */
 #define CYLINDER_TOP_AZ_MAX_G                (-0.70f)
@@ -46,10 +46,10 @@
 #define CYLINDER_EXIT_STRAIGHT_PROGRESS_DEG (300.0f) /* 进入出口直道阶段 */
 
 /* 出口最终姿态：pitch小于30度且az大于0.60g。 */
-#define CYLINDER_EXIT_GYRO_X_ABS_MAX_DPS     (70.0f)
+#define CYLINDER_EXIT_GYRO_X_ABS_MAX_DPS     (80.0f)
 #define CYLINDER_EXIT_PITCH_MAX_DEG          (60.0f)
 #define CYLINDER_EXIT_AZ_MIN_G               (0.60f)
-#define CYLINDER_EXIT_IMU_CONFIRM_SAMPLES    (8U) /* 8帧 x 5ms = 40ms */
+#define CYLINDER_EXIT_IMU_CONFIRM_SAMPLES    (4U) /* 4帧约6cm */
 #define CYLINDER_EXIT_CONFIRM_LATCH          (30U)
 
 /*
@@ -58,9 +58,9 @@
  * 入口特征消失8个ADC帧可提前解锁，否则200个ADC帧（约2s）后解锁。
  */
 #define CYLINDER_TEST_AUTO_REARM_ENABLE       (1U)
-#define CYLINDER_REARM_FLAT_CONFIRM_SAMPLES  (20U)
-#define CYLINDER_REARM_CLEAR_CONFIRM_SAMPLES  (8U)
-#define CYLINDER_REARM_LOCKOUT_MAX_SAMPLES   (100U)
+#define CYLINDER_REARM_FLAT_CONFIRM_SAMPLES  (5U)
+#define CYLINDER_REARM_CLEAR_CONFIRM_SAMPLES  (2U)
+#define CYLINDER_REARM_LOCKOUT_MAX_SAMPLES   (15U)
 
 /* 圆筒行为状态机，与car_control.c中的全局flag完全独立。 */
 #define CYLINDER_STATE_IDLE                 (0U) /* 未识别圆筒 */

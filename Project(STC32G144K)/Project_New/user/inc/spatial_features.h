@@ -5,9 +5,9 @@
 
 #define SPATIAL_NORM_MIN_G        (0.85f)
 #define SPATIAL_NORM_MAX_G        (1.15f)
-#define SPATIAL_FLAT_AY_MAX_G     (0.15f)
-#define SPATIAL_FLAT_AZ_MIN_G     (0.85f)
 #define SPATIAL_INVERTED_AZ_MAX_G (-0.65f)
+#define SPATIAL_BASELINE_PITCH_MIN_DEG  (-8.0f)
+#define SPATIAL_BASELINE_PITCH_MAX_DEG  (8.0f)
 
 float spatial_absf(float value);
 int16 spatial_clamp_i16(int16 value, int16 low, int16 high);

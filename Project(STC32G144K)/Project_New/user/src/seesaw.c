@@ -6,10 +6,10 @@
  * 速度策略以确保稳定通过。
  *
  * ## 模块架构
- * - **状态机**：IDLE → RISING → FALLING → ACTIVE → EXITED，共五个状态，
+ * - **状态机**：IDLE → RISING → EXITED，共三个有效状态，
  *   通过 Seesaw_ImuUpdate() 在每个 IMU 帧中推进。
  * - **速度控制**：在 RISING 阶段限制车速和左右轮差速，防止车辆在跷跷板上
- *   因姿态变化导致控制失稳；FALLING 之后恢复正常速度。
+ *   因姿态变化导致控制失稳；EXITED 后恢复正常速度。
  * - **外部接口**：本模块不直接操作电机，只接收当前 IMU 样本和 pitch，
  *   并发布状态供元素管理器和控制链调用。
  *
@@ -23,18 +23,16 @@
  * ## 关键设计决策
  * 1. **平面基线**：必须先建立平面基线（连续 flat 帧），才能接受上坡候选，
  *    避免车辆在非平面路段误判。
- * 2. **倾角峰值**：跟踪上升过程中的最大倾角，只有峰值超过最小有效峰值
- *    且出现持续下降趋势后才确认进入 FALLING。
- * 3. **候选超时**：超过 SEESAW_MAX_CANDIDATE_SAMPLES 帧或姿态倒置时
- *    自动撤销候选，防止状态机卡死。
- * 4. **模长容错**：加速度模长短时间超出有效范围时给予宽限期，避免因瞬时
- *    振动丢失候选。
+ * 2. **正值完成**：确认登板后，只要 pitch 转为正值就直接判定元素通过。
+ * 3. **候选超时**：超过 SEESAW_MAX_CANDIDATE_SAMPLES 帧时
+ *    直接判定本次跷跷板通过，防止状态机长期占用路线。
+ * 4. **模长容错**：候选期间模长无效只暂停其他姿态判断，不撤销候选。
  *
  * ## 坐标系约定
  * - ax/ay/az 单位为 g
  * - pitch直接由姿态解算传入；实车抬起时为负，下降时为正
  * - 跷跷板入口、抬起峰值和下降判断统一使用pitch，单位为度
- * - 所有 *_SAMPLES 表示去重后的有效 IMU 帧数（约 5ms/帧）
+ * - 所有 *_SAMPLES 表示去重后的有效 IMU 帧数（约 1.5cm/帧，按 3 m/s）。
  */
 
 #include "seesaw.h"
@@ -48,10 +46,7 @@ static volatile uint8 seesaw_state = SEESAW_STATE_IDLE; // 当前状态机状态
 static uint16 seesaw_baseline_count = 0; // 平面基线连续确认帧计数
 static uint8 seesaw_baseline_seen = 0; // 是否已建立平面基线（1 已建立，0 未建立）
 static uint16 seesaw_enter_count = 0; // 上坡倾角连续确认帧计数（进入 RISING 用）
-static uint16 seesaw_trend_count = 0; // 峰值后下降趋势连续确认帧计数
-static uint16 seesaw_exit_count = 0; // 回到平面连续确认帧计数（进入 EXITED 用）
 static uint16 seesaw_candidate_age = 0; // 候选已存活帧数，用于超时检测
-static uint8 seesaw_norm_invalid_count = 0; // 加速度模长连续无效帧计数
 static float seesaw_peak_tilt_deg = 0.0f; // 本次候选期间记录的最大上仰角，单位度
 
 /* ==========================================================================
@@ -72,17 +67,22 @@ static float seesaw_rising_tilt_deg(float pitch_deg)
  * @brief  清除本次候选的所有动态数据，回到 IDLE 状态。
  * @note   不清除平面基线（seesaw_baseline_seen 和 seesaw_baseline_count），
  *          因为基线是相对稳定的环境信息，无需每次候选结束都重新建立。
- *          清除的包括：状态、进入计数、趋势计数、退出计数、候选年龄、
- *          模长无效计数和峰值倾角。
+ *          清除的包括：状态、进入计数、候选年龄和峰值倾角。
  */
 static void seesaw_clear_candidate(void)
 {
     seesaw_state = SEESAW_STATE_IDLE;
     seesaw_enter_count = 0;
-    seesaw_trend_count = 0;
-    seesaw_exit_count = 0;
     seesaw_candidate_age = 0;
-    seesaw_norm_invalid_count = 0;
+    seesaw_peak_tilt_deg = 0.0f;
+}
+
+/* 标记本次跷跷板已通过，保留 EXITED 状态供元素管理器消费。 */
+static void seesaw_complete_candidate(void)
+{
+    seesaw_state = SEESAW_STATE_EXITED;
+    seesaw_enter_count = 0;
+    seesaw_candidate_age = 0;
     seesaw_peak_tilt_deg = 0.0f;
 }
 
@@ -118,27 +118,14 @@ void Seesaw_Init(void)
  * ### IDLE（空闲）
  * 等待平面基线建立，然后检测负pitch抬起候选：
  * 1. 连续 flat 帧建立平面基线（seesaw_baseline_seen = 1）。
- * 2. 基线建立后，检测pitch/az/norm条件是否满足抬起候选。
+ * 2. 基线建立后，检测pitch/norm条件是否满足抬起候选。
  * 3. 连续满足 SEESAW_ENTER_CONFIRM_SAMPLES 帧后进入 RISING。
  *
- * ### RISING / FALLING / ACTIVE（登板后）
- * 共享前置检查：
- * - 候选年龄超时 → 撤销候选
- * - 姿态倒置 → 撤销候选
- * - 加速度模长连续无效过多 → 撤销候选
- * - 倾角过大或 az 过低 → 撤销候选（可能进入其他立体元素）
- *
- * RISING 阶段：
- * - 跟踪峰值倾角seesaw_peak_tilt_deg
- * - 检测峰值是否达到最小有效值SEESAW_TILT_MIN_PEAK_DEG
- * - 检测pitch是否由负转正并连续达到+3度
- * - 满足负峰值和正pitch趋势后进入FALLING
- *
- * FALLING 阶段：
- * - 正pitch继续连续确认后进入ACTIVE
- *
- * ACTIVE 阶段：
- * - 连续 flat 帧确认后进入 EXITED
+ * ### RISING（登板后）
+ * - 候选年龄超时 → 直接判定元素通过
+ * - pitch转为正值 → 直接判定元素通过
+ * - 加速度模长无效 → 暂停其他姿态判断，但候选超时继续计时
+ * - 倾角过大 → 撤销候选（可能进入其他立体元素）
  *
  * ### EXITED
  * 直接返回 1，等待外部调用 Reset 或下一轮候选。
@@ -151,10 +138,8 @@ uint8 Seesaw_ImuUpdate(const imu_sample_t *sample, float pitch_deg)
 {
     float tilt_deg;      /* 负pitch对应的抬起角度幅值，单位度 */
     uint8 tilt_valid;    /* 上坡条件是否满足 */
-    uint8 trend_valid;   /* 下降趋势是否满足 */
     uint8 norm_valid;
     uint8 flat;
-    uint8 inverted;
 
     /* 空指针保护 */
     if (sample == (const imu_sample_t *)0)
@@ -164,10 +149,8 @@ uint8 Seesaw_ImuUpdate(const imu_sample_t *sample, float pitch_deg)
         sample->ax_g, sample->ay_g, sample->az_g,
         SPATIAL_NORM_MIN_G, SPATIAL_NORM_MAX_G);
     flat = (uint8)(norm_valid &&
-                   spatial_absf(sample->ay_g) <= SPATIAL_FLAT_AY_MAX_G &&
-                   sample->az_g >= SPATIAL_FLAT_AZ_MIN_G);
-    inverted = (uint8)(norm_valid &&
-                       sample->az_g <= SPATIAL_INVERTED_AZ_MAX_G);
+                   pitch_deg >= SPATIAL_BASELINE_PITCH_MIN_DEG &&
+                   pitch_deg <= SPATIAL_BASELINE_PITCH_MAX_DEG);
 
     /* ==================================================================
      * IDLE 状态：建立平面基线 + 检测上坡候选
@@ -203,14 +186,12 @@ uint8 Seesaw_ImuUpdate(const imu_sample_t *sample, float pitch_deg)
          * 步骤 2：检测上坡候选条件。
          * - 平面基线已建立
          * - 加速度模长有效（norm_valid）
-         * - Z 轴加速度不低于最低阈值（排除倒置姿态）
          * - pitch在[-SEESAW_TILT_MAX_DEG, -SEESAW_TILT_ENTER_DEG]范围内
          */
         tilt_deg = seesaw_rising_tilt_deg(pitch_deg);
         tilt_valid = (uint8)(
             seesaw_baseline_seen &&
             norm_valid &&
-            sample->az_g >= SEESAW_AZ_MIN_G &&
             tilt_deg >= SEESAW_TILT_ENTER_DEG &&
             tilt_deg <= SEESAW_TILT_MAX_DEG);
 
@@ -225,8 +206,6 @@ uint8 Seesaw_ImuUpdate(const imu_sample_t *sample, float pitch_deg)
             seesaw_state = SEESAW_STATE_RISING;
             seesaw_candidate_age = 0;
             seesaw_peak_tilt_deg = tilt_deg;
-            seesaw_trend_count = 0;
-            seesaw_exit_count = 0;
             seesaw_enter_count = 0;
         }
 
@@ -240,44 +219,35 @@ uint8 Seesaw_ImuUpdate(const imu_sample_t *sample, float pitch_deg)
         return 1;
 
     /* ==================================================================
-     * 候选存活期通用检查（RISING / FALLING / ACTIVE）
+     * RISING 候选存活期检查
      * ================================================================== */
 
     /* 候选年龄递增，防止溢出 */
     if (seesaw_candidate_age < 65535U)
         seesaw_candidate_age++;
 
-    /* 超时或姿态倒置 → 撤销候选 */
-    if (seesaw_candidate_age > SEESAW_MAX_CANDIDATE_SAMPLES ||
-        inverted)
+    /* 超时 → 直接完成本次跷跷板元素 */
+    if (seesaw_candidate_age > SEESAW_MAX_CANDIDATE_SAMPLES)
     {
-        seesaw_clear_candidate();
-        return 0;
-    }
-
-    /* 加速度模长无效容错 */
-    if (!norm_valid)
-    {
-        if (seesaw_norm_invalid_count <
-            SEESAW_NORM_INVALID_GRACE_SAMPLES)
-            seesaw_norm_invalid_count++;
-        if (seesaw_norm_invalid_count >=
-            SEESAW_NORM_INVALID_GRACE_SAMPLES)
-        {
-            /* 连续无效帧数超过宽限期，撤销候选 */
-            seesaw_clear_candidate();
-            return 0;
-        }
-        /* 宽限期内保持候选，但不更新状态 */
+        seesaw_complete_candidate();
         return 1;
     }
-    seesaw_norm_invalid_count = 0;  /* 模长恢复正常，清零计数器 */
 
-    /* pitch绝对值过大或Z轴过低时撤销候选。 */
+    /* 小车开始下俯即视为已飞离跷跷板控制窗口。 */
+    if (pitch_deg > 0.0f)
+    {
+        seesaw_complete_candidate();
+        return 1;
+    }
+
+    /* 动态飞离时模长可能长期偏离1g；暂停姿态推进，但不撤销候选。 */
+    if (!norm_valid)
+        return 1;
+
+    /* pitch绝对值过大时撤销候选。 */
     tilt_deg = seesaw_rising_tilt_deg(pitch_deg);
     if (pitch_deg > SEESAW_TILT_MAX_DEG ||
-        pitch_deg < -SEESAW_TILT_MAX_DEG ||
-        sample->az_g < SEESAW_AZ_MIN_G)
+        pitch_deg < -SEESAW_TILT_MAX_DEG)
     {
         seesaw_clear_candidate();
         return 0;
@@ -287,111 +257,39 @@ uint8 Seesaw_ImuUpdate(const imu_sample_t *sample, float pitch_deg)
     if (tilt_deg > seesaw_peak_tilt_deg)
         seesaw_peak_tilt_deg = tilt_deg;
 
-    /* 实车下降时pitch为正；连续达到+3度后确认下降趋势。 */
-    trend_valid = (uint8)(pitch_deg >= SEESAW_TILT_ENTER_DEG);
-    if (trend_valid)
+    /* 短暂倾斜后回平且峰值不足时，仍按入口误触处理。 */
+    if (flat &&
+        seesaw_peak_tilt_deg < SEESAW_TILT_MIN_PEAK_DEG)
     {
-        if (spatial_confirm_update(1,
-                                   SEESAW_TREND_CONFIRM_SAMPLES,
-                                   &seesaw_trend_count))
-            /* 饱和保持 */
-            seesaw_trend_count = SEESAW_TREND_CONFIRM_SAMPLES;
-    }
-    else
-    {
-        seesaw_trend_count = 0;
-    }
-
-    /* ==================================================================
-     * RISING → FALLING 状态转换
-     * ================================================================== */
-    if (seesaw_state == SEESAW_STATE_RISING)
-    {
-        /*
-         * 短暂倾斜后立即回平不足以识别跷跷板。
-         * 如果在平地上峰值仍小于最小有效峰值，放弃候选。
-         */
-        if (flat &&
-            seesaw_peak_tilt_deg < SEESAW_TILT_MIN_PEAK_DEG)
-        {
-            seesaw_clear_candidate();
-            return 0;
-        }
-
-        /*
-         * 进入 FALLING 的条件（同时满足）：
-         * 1. 峰值倾角 >= 最小有效峰值
-         * 2. 正pitch下降趋势连续确认
-         */
-        if (seesaw_peak_tilt_deg >= SEESAW_TILT_MIN_PEAK_DEG &&
-            seesaw_trend_count >= SEESAW_TREND_CONFIRM_SAMPLES)
-        {
-            seesaw_state = SEESAW_STATE_FALLING;
-            seesaw_trend_count = 0;
-        }
-    }
-    /* ==================================================================
-     * FALLING → ACTIVE 状态转换
-     * ================================================================== */
-    else if (seesaw_state == SEESAW_STATE_FALLING)
-    {
-        if (seesaw_trend_count >= SEESAW_TREND_CONFIRM_SAMPLES)
-        {
-            /* 进入FALLING后正pitch继续成立，确认有效跷跷板轨迹。 */
-            seesaw_state = SEESAW_STATE_ACTIVE;
-            seesaw_exit_count = 0;  /* 初始化退出计数 */
-        }
-    }
-
-    /* ==================================================================
-     * ACTIVE → EXITED 状态转换
-     * ================================================================== */
-    if (seesaw_state == SEESAW_STATE_ACTIVE)
-    {
-        if (flat)
-        {
-            /* 连续回到平面后退出 */
-            if (spatial_confirm_update(1,
-                                       SEESAW_EXIT_CONFIRM_SAMPLES,
-                                       &seesaw_exit_count))
-                seesaw_state = SEESAW_STATE_EXITED;
-        }
-        else
-        {
-            /* 不满足平面条件，重置退出计数 */
-            seesaw_exit_count = 0;
-        }
+        seesaw_clear_candidate();
+        return 0;
     }
 
     return (uint8)(seesaw_state != SEESAW_STATE_IDLE);
 }
 
 /**
- * @brief  判断当前是否处于候选阶段（RISING 或 FALLING）。
+ * @brief  判断当前是否处于登板候选阶段。
  * @return 1 表示处于候选阶段，0 表示不是。
  * @note   供元素管理器保存候选并触发低速保护。
  *          候选阶段表示已检测到上坡但尚未确认完整的跷跷板轨迹。
  */
 uint8 Seesaw_IsCandidate(void)
 {
-    return (uint8)(seesaw_state == SEESAW_STATE_RISING ||
-                   seesaw_state == SEESAW_STATE_FALLING);
+    return (uint8)(seesaw_state == SEESAW_STATE_RISING);
 }
 
 /**
- * @brief  判断是否已确认完成有效的跷跷板转折轨迹。
- * @return 1 表示已确认（ACTIVE 或 EXITED），0 表示未确认。
- * @note   返回 1 表示检测到完整的"上坡→峰值→下坡"过程，
- *          可用于路线确认和元素计数。
+ * @brief  判断是否已判定本次跷跷板通过。
+ * @return 1 表示已进入 EXITED，0 表示尚未通过。
  */
 uint8 Seesaw_IsConfirmed(void)
 {
-    return (uint8)(seesaw_state == SEESAW_STATE_ACTIVE ||
-                   seesaw_state == SEESAW_STATE_EXITED);
+    return (uint8)(seesaw_state == SEESAW_STATE_EXITED);
 }
 
 /**
- * @brief  判断是否已退出跷跷板元素（回到平面）。
+ * @brief  判断是否已通过跷跷板并释放当前路线元素。
  * @return 1 表示已退出（EXITED），0 表示未退出。
  * @note   供元素管理器推进到下一个路线元素。
  */
@@ -402,7 +300,7 @@ uint8 Seesaw_HasExited(void)
 
 /**
  * @brief  获取当前状态机状态字节。
- * @return 当前状态值（SEESAW_STATE_IDLE / RISING / FALLING / ACTIVE / EXITED）。
+ * @return 当前状态值（SEESAW_STATE_IDLE / RISING / EXITED）。
  * @note   供 TIM4 控制中断和调试打印读取。
  */
 uint8 Seesaw_GetState(void)
@@ -456,10 +354,10 @@ static int16 seesaw_crawl_target(int16 current_speed,
  * 行为：
  * - RISING 状态：返回低速上限值（straight_speed * 60%），防止车辆在
  *   跷跷板上因速度过快导致姿态失控。
- * - 其他状态（FALLING / ACTIVE / EXITED / IDLE）：原样返回 current_speed，
+ * - 其他状态（EXITED / IDLE）：原样返回 current_speed，
  *   车辆恢复普通巡线速度。
  *
- * @note   一旦 FALLING 确认，立即释放低速限制，使车辆恢复全速。
+ * @note   一旦 pitch 转正或候选超时进入 EXITED，立即释放低速限制。
  */
 int16 Seesaw_GetSpeedTarget(int16 current_speed, int16 straight_speed)
 {
@@ -485,7 +383,7 @@ int16 Seesaw_GetSpeedTarget(int16 current_speed, int16 straight_speed)
  *
  * @note   在 speed_adjust() 之后调用。
  *         目的是防止 RISING 阶段低速等待时，一侧轮子被方向环算成反转
- *         或差速过大导致车辆失控。FALLING/ACTIVE/EXITED 不干预原有差速。
+ *         或差速过大导致车辆失控。EXITED 不干预原有差速。
  *         支持正反转（center_speed 为负时会交换上下限）。
  */
 void Seesaw_ClampWheelTargets(int16 center_speed,
