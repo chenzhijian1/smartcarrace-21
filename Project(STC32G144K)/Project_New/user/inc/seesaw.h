@@ -14,6 +14,7 @@
 #define SEESAW_MAX_CANDIDATE_SAMPLES      (20U)
 
 #define SEESAW_SPEED_SLOW_PERCENT         (75U)
+#define SEESAW_RISING_BRAKE_DEBUG         (1U)
 #define SEESAW_SPEED_CRAWL_MIN            (100)
 #define SEESAW_SLOW_WHEEL_LOW_PERCENT     (50U)
 #define SEESAW_SLOW_WHEEL_HIGH_PERCENT    (150U)
@@ -26,6 +27,7 @@ void Seesaw_Reset(void);
 void Seesaw_ImuUpdate(const imu_sample_t *sample, float pitch_deg);
 uint8 Seesaw_HasExited(void);
 uint8 Seesaw_GetState(void);
+uint8 Seesaw_DebugBrakeRequested(void);
 int16 Seesaw_GetSpeedTarget(int16 current_speed, int16 straight_speed);
 void Seesaw_ClampWheelTargets(int16 center_speed,
                               int16 *left_speed,

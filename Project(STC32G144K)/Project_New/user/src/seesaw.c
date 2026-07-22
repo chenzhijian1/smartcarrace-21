@@ -135,6 +135,15 @@ uint8 Seesaw_GetState(void)
     return seesaw_state;
 }
 
+uint8 Seesaw_DebugBrakeRequested(void)
+{
+#if SEESAW_RISING_BRAKE_DEBUG
+    return (uint8)(seesaw_state == SEESAW_STATE_RISING);
+#else
+    return 0;
+#endif
+}
+
 static int16 seesaw_crawl_target(int16 current_speed, int16 straight_speed)
 {
     int32 current_abs;
