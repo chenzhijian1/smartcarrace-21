@@ -4,6 +4,9 @@
 #include "zf_common_typedef.h"
 #include "quaternion.h"
 
+/* 0: pure line-following test; 1: enable all element logic. */
+#define ELEMENT_ENABLE (0U)
+
 typedef enum
 {
     ELEMENT_SEESAW = 0,

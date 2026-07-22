@@ -194,20 +194,34 @@ void Element_Init(void)
     Huandao_Reset();
     Wall_Reset();
 
-    element_route_index = 0;
-    element_current_type = (uint8)element_route[0];
     element_lap_count = 0;
     element_cylinder_fan_boosted = 0;
     element_cylinder_fan_applied_pwm = 0;
     element_wall_fan_boosted = 0;
     element_wall_fan_applied_pwm = 0;
     motor_set_feedforward_pwm(0);
+
+    if (!ELEMENT_ENABLE)
+    {
+        element_route_index = ELEMENT_ROUTE_COUNT;
+        element_current_type = ELEMENT_DONE;
+        return;
+    }
+
+    element_route_index = 0;
+    element_current_type = (uint8)element_route[0];
 }
 
 void Element_ImuUpdate(const imu_sample_t *sample)
 {
     uint8 cylinder_on_surface;
     uint8 wall_state;
+
+    if (!ELEMENT_ENABLE)
+    {
+        motor_set_feedforward_pwm(0);
+        return;
+    }
 
     if (sample == (const imu_sample_t *)0)
         return;
@@ -255,6 +269,9 @@ void Element_ImuUpdate(const imu_sample_t *sample)
 
 uint8 Element_AdcUpdate(void)
 {
+    if (!ELEMENT_ENABLE)
+        return 0;
+
     if ((element_type_t)element_current_type == ELEMENT_CYLINDER)
     {
         Cylinder_AdcUpdate();
@@ -269,6 +286,9 @@ uint8 Element_AdcUpdate(void)
 
 uint8 Element_IsStraightHold(void)
 {
+    if (!ELEMENT_ENABLE)
+        return 0;
+
     return (uint8)(
         (element_type_t)element_current_type == ELEMENT_HUANDAO &&
         Huandao_DetectIsStraightHold());
@@ -278,6 +298,9 @@ void Element_PrepareControl(int16 straight_speed,
                             int16 *target_speed,
                             int16 *direction_diff)
 {
+    if (!ELEMENT_ENABLE)
+        return;
+
     if (target_speed == (int16 *)0 || direction_diff == (int16 *)0)
         return;
 
@@ -311,6 +334,9 @@ void Element_ClampWheelTargets(int16 center_speed,
                                int16 *left_speed,
                                int16 *right_speed)
 {
+    if (!ELEMENT_ENABLE)
+        return;
+
     if ((element_type_t)element_current_type == ELEMENT_SEESAW)
         Seesaw_ClampWheelTargets(center_speed, left_speed, right_speed);
     else if ((element_type_t)element_current_type == ELEMENT_WALL)
