@@ -298,7 +298,8 @@ void Element_ImuUpdate(const imu_sample_t *sample)
             cylinder_on_surface = Cylinder_ImuUpdate(sample->ay_g,
                                                      sample->az_g,
                                                      sample->gx_dps,
-                                                     euler.pitch);
+                                                     euler.pitch,
+                                                     euler.yaw);
             element_update_cylinder_fan(cylinder_on_surface);
             if (Cylinder_HasExited())
                 element_complete(ELEMENT_CYLINDER);
@@ -363,6 +364,8 @@ void Element_PrepareControl(int16 straight_speed,
                                                   straight_speed);
             break;
         case ELEMENT_CYLINDER:
+            *target_speed = Cylinder_GetSpeedTarget(*target_speed,
+                                                    straight_speed);
             if (Cylinder_IsEntryLeftTurnGuardActive())
                 *direction_diff = Cylinder_LimitPreEntryDiff(*direction_diff);
             break;

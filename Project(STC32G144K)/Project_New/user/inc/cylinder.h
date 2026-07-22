@@ -19,13 +19,14 @@
  */
 #define CYLINDER_PRE_ENTRY_INWARD_DIFF_MAX   (3)   /* 入口左转上限 */
 #define CYLINDER_PRE_ENTRY_OUTWARD_DIFF_MAX  (160) /* 允许向右修正的最大差速 */
-#define CYLINDER_ENTRY_LEFT_GUARD_DEG         (0.0f)
+#define CYLINDER_ENTRY_LEFT_GUARD_DEG         (0.0f) /* 入口左转保护解除角度，进度到达后允许左转 */
 
-#define CYLINDER_GRAVITY_FF_PWM                (1600.0f)//圆筒重力前馈
-#define CYLINDER_SATURATION_PWM_THRESHOLD      (9500)
-#define CYLINDER_SATURATION_ERROR_THRESHOLD    (80)
-#define CYLINDER_SATURATION_CONFIRM_TICKS      (4U)
-#define CYLINDER_SATURATION_DIFF_PERCENT       (90L)
+#define CYLINDER_GRAVITY_FF_PWM                (1600.0f) /* 圆筒重力前馈PWM基值 */
+#define CYLINDER_TOP_SPEED_PERCENT             (100U)    /* 圆筒顶部目标为普通设定速度的120% */
+#define CYLINDER_SATURATION_PWM_THRESHOLD      (9500)    /* 电机饱和检测：PWM占空比阈值 */
+#define CYLINDER_SATURATION_ERROR_THRESHOLD    (80)      /* 电机饱和检测：误差阈值 */
+#define CYLINDER_SATURATION_CONFIRM_TICKS      (4U)      /* 电机饱和检测：连续确认拍数 */
+#define CYLINDER_SATURATION_DIFF_PERCENT       (90L)     /* 电机饱和后保留的差速百分比（90%） */
 
 /* 开始登筒：车辆pitch连续小于-5度。 */
 #define CYLINDER_ENTRY_PITCH_MAX_DEG          (-5.0f)
@@ -45,12 +46,13 @@
 #define CYLINDER_EXIT_PROGRESS_DEG           (270.0f) /* 允许检查最终出口姿态 */
 #define CYLINDER_EXIT_STRAIGHT_PROGRESS_DEG (300.0f) /* 进入出口直道阶段 */
 
-/* 出口最终姿态：pitch小于30度且az大于0.60g。 */
-#define CYLINDER_EXIT_GYRO_X_ABS_MAX_DPS     (80.0f)
-#define CYLINDER_EXIT_PITCH_MAX_DEG          (60.0f)
-#define CYLINDER_EXIT_AZ_MIN_G               (0.60f)
-#define CYLINDER_EXIT_IMU_CONFIRM_SAMPLES    (4U) /* 4帧约6cm */
-#define CYLINDER_EXIT_CONFIRM_LATCH          (30U)
+/* 出口最终姿态：车身接近水平（pitch小、az接近1g）、角速度小。 */
+#define CYLINDER_EXIT_GYRO_X_ABS_MAX_DPS     (80.0f)  /* gyro_x绝对值上限，角速度需足够小 */
+#define CYLINDER_EXIT_PITCH_MAX_DEG          (60.0f)  /* 俯仰角上限，车头需接近水平 */
+#define CYLINDER_EXIT_AZ_MIN_G               (0.60f)   /* Z轴加速度下限，车身需接近正立 */
+#define CYLINDER_EXIT_IMU_CONFIRM_SAMPLES    (4U)      /* 出口姿态连续确认帧数，4帧约6cm */
+#define CYLINDER_LEAVE_YAW_DELTA_DEG          (70.0f)  /* 进入状态3后，航向正向变化超过该角度才完成 */
+#define CYLINDER_EXIT_CONFIRM_LATCH          (30U)     /* 出口确认锁存值，用于HasExited()判断 */
 
 /*
  * 短赛道稳定性测试用自动复位。
@@ -58,9 +60,9 @@
  * 入口特征消失8个ADC帧可提前解锁，否则200个ADC帧（约2s）后解锁。
  */
 #define CYLINDER_TEST_AUTO_REARM_ENABLE       (1U)
-#define CYLINDER_REARM_FLAT_CONFIRM_SAMPLES  (5U)
-#define CYLINDER_REARM_CLEAR_CONFIRM_SAMPLES  (2U)
-#define CYLINDER_REARM_LOCKOUT_MAX_SAMPLES   (15U)
+#define CYLINDER_REARM_FLAT_CONFIRM_SAMPLES  (5U)  /* 自动复位：正立连续确认帧数 */
+#define CYLINDER_REARM_CLEAR_CONFIRM_SAMPLES  (2U)  /* 自动复位：入口信号消失解除锁定的帧数 */
+#define CYLINDER_REARM_LOCKOUT_MAX_SAMPLES   (15U)  /* 自动复位：入口锁定超时帧数 */
 
 /* 圆筒行为状态机，与car_control.c中的全局flag完全独立。 */
 #define CYLINDER_STATE_IDLE                 (0U) /* 未识别圆筒 */
@@ -74,7 +76,8 @@ void Cylinder_Init(void);
 /* 消费direction_adc_get()刚刚更新的ad_ave[]，不引入额外电感帧结构。 */
 uint8 Cylinder_AdcUpdate(void);
 uint8 Cylinder_ImuUpdate(float ay_g, float az_g,
-                         float gyro_x_dps, float pitch_deg);
+                         float gyro_x_dps, float pitch_deg,
+                         float yaw_deg);
 
 /* ---------- 状态查询与入口转向保护 ---------- */
 uint8 Cylinder_EntryIsDetected(void);  /* 本轮曾识别入口 */
@@ -83,6 +86,7 @@ uint8 Cylinder_HasExited(void);        /* 本轮是否已确认退出 */
 uint8 Cylinder_GetState(void);         /* CYLINDER_STATE_xxx */
 uint8 Cylinder_IsEntryLeftTurnGuardActive(void);
 int16 Cylinder_LimitPreEntryDiff(int16 direction_diff);
+int16 Cylinder_GetSpeedTarget(int16 current_speed, int16 straight_speed);
 void Cylinder_UpdateGravityFeedforward(float pitch_sin);
 int16 Cylinder_GetGravityFeedforwardPwm(void);
 
