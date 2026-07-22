@@ -17,7 +17,7 @@
 /*---------------------------------------------------------------------------
  * 状态标志变�?
  *---------------------------------------------------------------------------*/
-uint8 flag = 0;
+uint8 flag = CAR_STATE_NORMAL;
 uint8 flag_stop = 0;
 uint8 flag_key_control = 0;
 uint8 flag_key_fast = 0;
@@ -173,7 +173,7 @@ void CarControl_LaunchMode(void) {
 
     if (cnt_launch >= LAUNCH_FAN_DELAY_TICKS) {
         cnt_launch = 0;
-        flag = 0;
+        flag = CAR_STATE_NORMAL;
     }
 }
 
@@ -195,15 +195,15 @@ void CarControl_StopMode(void) {
         flag_key_control = 0;
         suction_fan_off();
         send_flag_nav = 1;
-        flag = 0;
+        flag = CAR_STATE_NORMAL;
     }
 }
 
 void CarControl_RequestSoftStop(void) {
-    if (flag == 0 && normal_speed > 0) {
+    if (flag == CAR_STATE_NORMAL && normal_speed > 0) {
         soft_stop_start_speed = normal_speed;
         cnt_stop = 0;
-        flag = 5;
+        flag = CAR_STATE_SOFT_STOP;
         normal_speed = 0;
     }
 }
@@ -220,7 +220,7 @@ void CarControl_Update(void) {
     else if (launch_ready) {
         launch_ready = 0;
         cnt_launch = 0;
-        flag = 4;
+        flag = CAR_STATE_LAUNCH;
     }
 
     if (flag_stop == 0) {
@@ -232,31 +232,15 @@ void CarControl_Update(void) {
             gyro_z = 0.0f;
 
         switch (flag) {
-            case 0:  // 正常模式
+            case CAR_STATE_NORMAL:
                 CarControl_NormalMode(250, 1000);
                 break;
-            
-            case 1:
-                Huandao_PreCircle();
-                break;
 
-            case 2:
-                Huandao_EnterCircle();
-                break;
-
-            case 3:
-                Huandao_InsideCircle();
-                break;
-
-            case 7:
-                Huandao_ExitStraight();
-                break;
-
-            case 4:  // 起步发车
+            case CAR_STATE_LAUNCH:
                 CarControl_LaunchMode();
                 break;
 
-            case 5:  // 慢速停�?
+            case CAR_STATE_SOFT_STOP:
                 CarControl_StopMode();
                 break;
 

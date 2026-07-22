@@ -2,6 +2,7 @@
 #include "element.h"
 #include "seesaw.h"
 #include "cylinder.h"
+#include "huandao.h"
 #include "wall.h"
 
 volatile uint8 send_flag = 1;
@@ -50,8 +51,9 @@ void uart_telemetry_print(void)
             break;
 
         case 4:
-            printf("%u,%u,", Element_GetRouteIndex(), Element_GetCurrent());
-            printf("%u,%u,%u,", Seesaw_GetState(), Cylinder_GetState(),
+            printf("%u,%u,%u,%u,", Element_GetRouteIndex(), Element_GetCurrent(),
+                   Element_GetLapCount(), Element_GetLapTarget());
+            printf("%u,%u,%u,%u,", Huandao_GetState(), Seesaw_GetState(), Cylinder_GetState(),
                    Wall_GetState());
             printf("%.2f\r\n", euler.pitch);
             break;

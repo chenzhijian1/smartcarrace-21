@@ -23,6 +23,15 @@
 #define HUANDAO_DIR_SOURCE_SENSOR (1)
 #define HUANDAO_MAX_COUNT          (5)
 
+typedef enum
+{
+    HUANDAO_STATE_IDLE = 0,
+    HUANDAO_STATE_PRE_CIRCLE,
+    HUANDAO_STATE_ENTER_CIRCLE,
+    HUANDAO_STATE_INSIDE_CIRCLE,
+    HUANDAO_STATE_EXIT_STRAIGHT
+} huandao_state_t;
+
 /*---------------------------------------------------------------------------
  * 环岛参数配置
  *---------------------------------------------------------------------------*/
@@ -46,15 +55,14 @@ void Huandao_Init(void);            // 环岛参数初始化（从EEPROM读取�
 void Huandao_SaveConfig(void);      // 保存环岛参数到EEPROM
 
 // 环岛状态处理
-void Huandao_PreCircle(void);       // 预环岛模式(flag=1)
-void Huandao_EnterCircle(void);     // 入环模式(flag=2)
-void Huandao_InsideCircle(void);    // 环内循迹(flag=3)
-void Huandao_ExitStraight(void);    // 出环直行(flag=7)
-
 uint8 Huandao_DetectUpdate(void);
 uint8 Huandao_DetectIsStraightHold(void);
 void Huandao_DetectReset(void);
 uint8 Huandao_ConsumeExitEvent(void);
+void Huandao_PrepareControl(int16 straight_speed,
+                            int16 *target_speed,
+                            int16 *direction_diff);
+huandao_state_t Huandao_GetState(void);
 
 // 辅助函数
 void Huandao_Reset(void);           // 重置环岛状态

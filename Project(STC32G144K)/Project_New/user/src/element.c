@@ -21,22 +21,26 @@ static const element_type_t element_route[] =
 
 static volatile uint8 element_route_index = 0;
 static volatile uint8 element_current_type = ELEMENT_DONE;
+static volatile uint8 element_lap_count = 0;
 static uint8 element_cylinder_fan_boosted = 0;
 static uint16 element_cylinder_fan_applied_pwm = 0;
 
 uint16 suction_fan_pwm_cylinder = 10000;
+/* 目标圈数，修改此值即可设置本次运行完成多少圈。 */
+uint8 element_lap_target = 1;
 
 static uint8 element_feedforward_is_allowed(void)
 {
-    if (voltage_battery_is_low() || flag == 4)
+    if (voltage_battery_is_low() || flag == CAR_STATE_LAUNCH)
         return 0;
 
-    if (normal_speed == 0 && flag != 5)
+    if (normal_speed == 0 && flag != CAR_STATE_SOFT_STOP)
         return 0;
 
     return 1;
 }
 
+// 根据当前元素类型和IMU姿态计算重力前馈PWM，并设置到电机控制器。
 static void element_update_gravity_feedforward(void)
 {
     float pitch_sin;
@@ -66,6 +70,7 @@ static void element_update_gravity_feedforward(void)
     motor_set_feedforward_pwm(feedforward_pwm);
 }
 
+// 圆筒加大负压控制逻辑
 static void element_update_cylinder_fan(uint8 on_surface)
 {
     if (on_surface && !element_cylinder_fan_boosted)
@@ -87,7 +92,7 @@ static void element_update_cylinder_fan(uint8 on_surface)
         /* 安全逻辑已关闭风机时，不在主循环中重新启动。 */
         if (pwm_fan != element_cylinder_fan_applied_pwm ||
             flag_suction_fan_off || voltage_battery_is_low() ||
-            (normal_speed == 0 && flag != 5))
+            (normal_speed == 0 && flag != CAR_STATE_SOFT_STOP))
             return;
 
         suction_fan_on(suction_fan_pwm_start);
@@ -128,8 +133,18 @@ static void element_complete(element_type_t completed_type)
 
     if ((uint8)(element_route_index + 1U) >= ELEMENT_ROUTE_COUNT)
     {
-        element_route_index = ELEMENT_ROUTE_COUNT;
-        element_current_type = ELEMENT_DONE;
+        element_lap_count++;
+        if (element_lap_count >= element_lap_target)
+        {
+            element_route_index = ELEMENT_ROUTE_COUNT;
+            element_current_type = ELEMENT_DONE;
+        }
+        else
+        {
+            element_route_index = 0;
+            element_current_type = (uint8)element_route[0];
+            element_reset_type((element_type_t)element_current_type);
+        }
         return;
     }
 
@@ -140,13 +155,18 @@ static void element_complete(element_type_t completed_type)
 
 void Element_Init(void)
 {
+    if (element_lap_target == 0)
+        element_lap_target = 1;
+
     Seesaw_Reset();
     Cylinder_Reset();
     Huandao_DetectReset();
+    Huandao_Reset();
     Wall_Reset();
 
     element_route_index = 0;
     element_current_type = (uint8)element_route[0];
+    element_lap_count = 0;
     element_cylinder_fan_boosted = 0;
     element_cylinder_fan_applied_pwm = 0;
     motor_set_feedforward_pwm(0);
@@ -162,7 +182,7 @@ void Element_ImuUpdate(const imu_sample_t *sample)
     switch ((element_type_t)element_current_type)
     {
         case ELEMENT_SEESAW:
-            Seesaw_ImuUpdate(sample, euler.pitch);
+            Seesaw_ImuUpdate(euler.pitch);
             if (Seesaw_HasExited())
                 element_complete(ELEMENT_SEESAW);
             break;
@@ -226,12 +246,16 @@ void Element_PrepareControl(int16 straight_speed,
     switch ((element_type_t)element_current_type)
     {
         case ELEMENT_SEESAW:
-            *target_speed = Seesaw_GetSpeedTarget(*target_speed,
-                                                  straight_speed);
+            *target_speed = Seesaw_GetSpeedTarget(*target_speed);
             break;
         case ELEMENT_CYLINDER:
             if (Cylinder_IsEntryLeftTurnGuardActive())
                 *direction_diff = Cylinder_LimitPreEntryDiff(*direction_diff);
+            break;
+        case ELEMENT_HUANDAO:
+            Huandao_PrepareControl(straight_speed,
+                                   target_speed,
+                                   direction_diff);
             break;
         case ELEMENT_WALL:
             *target_speed = Wall_GetSpeedTarget(*target_speed,
@@ -246,9 +270,7 @@ void Element_ClampWheelTargets(int16 center_speed,
                                int16 *left_speed,
                                int16 *right_speed)
 {
-    if ((element_type_t)element_current_type == ELEMENT_SEESAW)
-        Seesaw_ClampWheelTargets(center_speed, left_speed, right_speed);
-    else if ((element_type_t)element_current_type == ELEMENT_WALL)
+    if ((element_type_t)element_current_type == ELEMENT_WALL)
         Wall_ClampWheelTargets(center_speed, left_speed, right_speed);
 }
 
@@ -260,4 +282,14 @@ element_type_t Element_GetCurrent(void)
 uint8 Element_GetRouteIndex(void)
 {
     return element_route_index;
+}
+
+uint8 Element_GetLapCount(void)
+{
+    return element_lap_count;
+}
+
+uint8 Element_GetLapTarget(void)
+{
+    return element_lap_target;
 }

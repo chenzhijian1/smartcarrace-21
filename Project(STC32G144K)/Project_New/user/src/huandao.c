@@ -46,6 +46,7 @@ static uint8 huandao_r_iap[HUANDAO_MAX_COUNT] = {30, 35, 30, 30, 30};
  * 环岛状态变量
  *---------------------------------------------------------------------------*/
 uint8 flag_huandao = 0;         // 0:左环岛, 1:右环岛
+static volatile huandao_state_t huandao_state = HUANDAO_STATE_IDLE;
 static uint8 huandao_angle_set = 0;
 static float huandao_enter_start_yaw = 0.0f;
 static float huandao_inside_start_yaw = 0.0f;
@@ -74,6 +75,7 @@ static void huandao_detect_reset_counters(void)
 void Huandao_DetectReset(void)
 {
     huandao_detect_state = HUANDAO_DETECT_NORMAL;
+    huandao_state = HUANDAO_STATE_IDLE;
     huandao_detect_entry_encoder = 0.0f;
     huandao_exit_event = 0;
     huandao_detect_reset_counters();
@@ -109,7 +111,7 @@ uint8 Huandao_DetectUpdate(void)
 
     if (huandao_detect_state == HUANDAO_DETECT_REARM)
     {
-        if (flag == 0 && AD_ONE[0] < huandao_rearm_h_threshold &&
+        if (flag == CAR_STATE_NORMAL && AD_ONE[0] < huandao_rearm_h_threshold &&
             AD_ONE[4] < huandao_rearm_h_threshold)
         {
             if (++huandao_rearm_count >= HUANDAO_DETECT_CONFIRM_COUNT)
@@ -124,7 +126,7 @@ uint8 Huandao_DetectUpdate(void)
 
     if (huandao_detect_state == HUANDAO_DETECT_NORMAL)
     {
-        if (flag == 0 && AD_ONE[0] > huandao_pre_h_threshold &&
+        if (flag == CAR_STATE_NORMAL && AD_ONE[0] > huandao_pre_h_threshold &&
             AD_ONE[4] > huandao_pre_h_threshold)
         {
             if (++huandao_pre_count >= HUANDAO_DETECT_CONFIRM_COUNT)
@@ -158,7 +160,7 @@ uint8 Huandao_DetectUpdate(void)
             (uint8)(huandao_left_count >= HUANDAO_DETECT_CONFIRM_COUNT ? 0 : 1));
         encoder_temp = encoder_ave;
         huandao_detect_state = HUANDAO_DETECT_ACTIVE;
-        flag = 1;
+        huandao_state = HUANDAO_STATE_PRE_CIRCLE;
         return 1;
     }
 
@@ -176,119 +178,144 @@ uint8 Huandao_ConsumeExitEvent(void)
 }
 
 /*---------------------------------------------------------------------------
- * 预环岛模式 (flag=1)
+ * 预环岛阶段
  * 功能：直行到环岛入口
  *---------------------------------------------------------------------------*/
-void Huandao_PreCircle(void) {
+static void huandao_prepare_pre_circle(int16 straight_speed,
+                                       int16 *target_speed,
+                                       int16 *direction_diff) {
+    *target_speed = straight_speed;
+    *direction_diff = 0;
+
     if (encoder_ave - encoder_temp < distance_before_huandao[huandao_count]) {
-        // 还没到环岛交点，直行
-        set_leftspeed = normal_speed;
-        set_rightspeed = normal_speed;
+        return;
     }
-    else {
-        huandao_angle_set = 0;
-        flag = 2;
-    }
+
+    huandao_angle_set = 0;
+    huandao_state = HUANDAO_STATE_ENTER_CIRCLE;
 }
 
 /*---------------------------------------------------------------------------
- * 入环模式 (flag=2)
+ * 入环阶段
  * 功能：差速入环直到达到目标角度
  *---------------------------------------------------------------------------*/
-void Huandao_EnterCircle(void) {
+static void huandao_prepare_enter_circle(int16 straight_speed,
+                                         int16 *direction_diff) {
+    int16 entry_bias;
+
     if (huandao_angle_set == 0) {
         huandao_enter_start_yaw = euler.yaw;
         huandao_angle_set = 1;
     }
 
-    dir_pid(aaddcc.err_dir, aaddcc.last_err_dir, gyro_z);
-    normal_speed_cal = (int16)-s * aaddcc.err_dir * aaddcc.err_dir + normal_speed;
-    normal_speed_pre = normal_speed;
-    test_speed = normal_speed_cal;
-
-    {
-        int16 entry_bias;
-
-        entry_bias = (int16)((float)normal_speed * HUANDAO_ENTRY_BIAS_RATIO);
-        if (entry_bias < 0) {
-            entry_bias = 0;
-        }
-
-        // changed_speed > 0 turns left; changed_speed < 0 turns right.
-        if (flag_huandao == 0) {
-            if (changed_speed < entry_bias) {
-                changed_speed = entry_bias;
-            }
-        }
-        else if (changed_speed > -entry_bias) {
-            changed_speed = -entry_bias;
-        }
+    entry_bias = (int16)((float)straight_speed * HUANDAO_ENTRY_BIAS_RATIO);
+    if (entry_bias < 0) {
+        entry_bias = 0;
     }
 
-    speed_adjust(250, 1000);
+    // direction_diff > 0 turns left; direction_diff < 0 turns right.
+    if (flag_huandao == 0) {
+        if (*direction_diff < entry_bias) {
+            *direction_diff = entry_bias;
+        }
+    }
+    else if (*direction_diff > -entry_bias) {
+        *direction_diff = -entry_bias;
+    }
 
     if (flag_huandao == 0) {
         if (euler.yaw >= huandao_enter_start_yaw + HUANDAO_ENTER_ANGLE) {
             huandao_inside_start_yaw = euler.yaw;
-            flag = 3;
+            huandao_state = HUANDAO_STATE_INSIDE_CIRCLE;
         }
     }
     else if (euler.yaw <= huandao_enter_start_yaw - HUANDAO_ENTER_ANGLE) {
         huandao_inside_start_yaw = euler.yaw;
-        flag = 3;
+        huandao_state = HUANDAO_STATE_INSIDE_CIRCLE;
     }
 }
 
 /*---------------------------------------------------------------------------
- * 环内循迹 (flag=3)
+ * 环内循迹阶段
  * 功能：环内电感循迹直到出环角度
  *---------------------------------------------------------------------------*/
-void Huandao_InsideCircle(void) {
+static void huandao_prepare_inside_circle(void) {
     if (flag_huandao == 0) {
-        if (euler.yaw < huandao_inside_start_yaw + HUANDAO_INSIDE_ANGLE) {
-            CarControl_NormalMode(250, 1000);
-        }
-        else {
-            flag = 7;
+        if (euler.yaw >= huandao_inside_start_yaw + HUANDAO_INSIDE_ANGLE) {
+            huandao_state = HUANDAO_STATE_EXIT_STRAIGHT;
             encoder_temp = encoder_ave;
         }
     }
     else {
-        if (euler.yaw > huandao_inside_start_yaw - HUANDAO_INSIDE_ANGLE) {
-            CarControl_NormalMode(250, 1000);
-        }
-        else {
-            flag = 7;
+        if (euler.yaw <= huandao_inside_start_yaw - HUANDAO_INSIDE_ANGLE) {
+            huandao_state = HUANDAO_STATE_EXIT_STRAIGHT;
             encoder_temp = encoder_ave;
         }
     }
 }
 
 /*---------------------------------------------------------------------------
- * 出环直行 (flag=7)
+ * 出环直行阶段
  * 功能：出环后直行一段距离
  *---------------------------------------------------------------------------*/
-void Huandao_ExitStraight(void) {
+static void huandao_prepare_exit_straight(int16 straight_speed,
+                                          int16 *target_speed,
+                                          int16 *direction_diff) {
+    *target_speed = straight_speed;
+    *direction_diff = 0;
+
     if (encoder_ave - encoder_temp < HUANDAO_EXIT_DISTANCE) {
-        set_leftspeed = normal_speed;
-        set_rightspeed = normal_speed;
+        return;
     }
-    else {
-        // 恢复到正常循迹
-        flag = 0;
-        huandao_detect_start_rearm();
-        huandao_exit_event = 1;
-        Huandao_Reset();
-        if (huandao_num > 0) {
-            huandao_count = (huandao_count + 1) % huandao_num;
-        }
+
+    huandao_detect_start_rearm();
+    huandao_exit_event = 1;
+    Huandao_Reset();
+    if (huandao_num > 0) {
+        huandao_count = (huandao_count + 1) % huandao_num;
     }
+}
+
+void Huandao_PrepareControl(int16 straight_speed,
+                            int16 *target_speed,
+                            int16 *direction_diff)
+{
+    if (target_speed == (int16 *)0 || direction_diff == (int16 *)0)
+        return;
+
+    switch (huandao_state)
+    {
+        case HUANDAO_STATE_PRE_CIRCLE:
+            huandao_prepare_pre_circle(straight_speed,
+                                       target_speed,
+                                       direction_diff);
+            break;
+        case HUANDAO_STATE_ENTER_CIRCLE:
+            huandao_prepare_enter_circle(straight_speed, direction_diff);
+            break;
+        case HUANDAO_STATE_INSIDE_CIRCLE:
+            huandao_prepare_inside_circle();
+            break;
+        case HUANDAO_STATE_EXIT_STRAIGHT:
+            huandao_prepare_exit_straight(straight_speed,
+                                          target_speed,
+                                          direction_diff);
+            break;
+        default:
+            break;
+    }
+}
+
+huandao_state_t Huandao_GetState(void)
+{
+    return huandao_state;
 }
 
 /*---------------------------------------------------------------------------
  * 重置环岛状态
  *---------------------------------------------------------------------------*/
 void Huandao_Reset(void) {
+    huandao_state = HUANDAO_STATE_IDLE;
     flag_huandao = 0;
     huandao_angle_set = 0;
     huandao_enter_start_yaw = 0.0f;

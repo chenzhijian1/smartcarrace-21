@@ -107,10 +107,21 @@ static uint8 uart_command_apply(char *cmd)
         return 1;
     }
 
-    // f0~f9: 直接修改车辆状态 flag，例如 f4 进入起步状态，f5 进入慢速停车状态
+    // f0/f4/f5: generic vehicle states; roundabout stages are internal to huandao.c
     if (cmd[0] == 'f' && cmd[1] >= '0' && cmd[1] <= '9' && cmd[2] == '\0')
     {
-        flag = (uint8)(cmd[1] - '0');
+        uint8 requested_state = (uint8)(cmd[1] - '0');
+
+        if (requested_state != CAR_STATE_NORMAL &&
+            requested_state != CAR_STATE_LAUNCH &&
+            requested_state != CAR_STATE_SOFT_STOP)
+        {
+            printf("error,flag,%d\r\n", requested_state);
+            uart_feedback_hold_start();
+            return 1;
+        }
+
+        flag = requested_state;
         printf("flag,%d\r\n", flag);
         uart_feedback_hold_start();
         return 1;

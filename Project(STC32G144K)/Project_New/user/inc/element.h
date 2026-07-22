@@ -26,7 +26,10 @@ void Element_ClampWheelTargets(int16 center_speed,
 
 element_type_t Element_GetCurrent(void);
 uint8 Element_GetRouteIndex(void);
+uint8 Element_GetLapCount(void);
+uint8 Element_GetLapTarget(void);
 
 extern uint16 suction_fan_pwm_cylinder;
+extern uint8 element_lap_target;
 
 #endif
