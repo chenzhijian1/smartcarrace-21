@@ -24,8 +24,11 @@ static volatile uint8 element_current_type = ELEMENT_DONE;
 static volatile uint8 element_lap_count = 0;
 static uint8 element_cylinder_fan_boosted = 0;
 static uint16 element_cylinder_fan_applied_pwm = 0;
+static uint8 element_wall_fan_boosted = 0;
+static uint16 element_wall_fan_applied_pwm = 0;
 
-uint16 suction_fan_pwm_cylinder = 10000;
+uint16 suction_fan_pwm_cylinder = 6800;
+uint16 suction_fan_pwm_wall = 7200;
 /* 目标圈数，修改此值即可设置本次运行完成多少圈。 */
 uint8 element_lap_target = 1;
 
@@ -100,6 +103,33 @@ static void element_update_cylinder_fan(uint8 on_surface)
     }
 }
 
+static void element_update_wall_fan(uint8 on_surface)
+{
+    if (on_surface && !element_wall_fan_boosted)
+    {
+        if (pwm_fan == 0 || flag_suction_fan_off)
+            return;
+
+        element_wall_fan_boosted = 1;
+        element_wall_fan_applied_pwm = suction_fan_pwm_wall;
+        if (suction_fan_pwm_wall == 0)
+            suction_fan_off();
+        else
+            suction_fan_on(suction_fan_pwm_wall);
+    }
+    else if (!on_surface && element_wall_fan_boosted)
+    {
+        element_wall_fan_boosted = 0;
+        if (pwm_fan != element_wall_fan_applied_pwm ||
+            flag_suction_fan_off || voltage_battery_is_low() ||
+            (normal_speed == 0 && flag != CAR_STATE_SOFT_STOP))
+            return;
+
+        suction_fan_on(suction_fan_pwm_start);
+        element_wall_fan_applied_pwm = 0;
+    }
+}
+
 static void element_reset_type(element_type_t type)
 {
     motor_set_feedforward_pwm(0);
@@ -169,12 +199,15 @@ void Element_Init(void)
     element_lap_count = 0;
     element_cylinder_fan_boosted = 0;
     element_cylinder_fan_applied_pwm = 0;
+    element_wall_fan_boosted = 0;
+    element_wall_fan_applied_pwm = 0;
     motor_set_feedforward_pwm(0);
 }
 
 void Element_ImuUpdate(const imu_sample_t *sample)
 {
     uint8 cylinder_on_surface;
+    uint8 wall_state;
 
     if (sample == (const imu_sample_t *)0)
         return;
@@ -182,7 +215,7 @@ void Element_ImuUpdate(const imu_sample_t *sample)
     switch ((element_type_t)element_current_type)
     {
         case ELEMENT_SEESAW:
-            Seesaw_ImuUpdate(euler.pitch);
+            Seesaw_ImuUpdate(sample, euler.pitch);
             if (Seesaw_HasExited())
                 element_complete(ELEMENT_SEESAW);
             break;
@@ -191,7 +224,8 @@ void Element_ImuUpdate(const imu_sample_t *sample)
             cylinder_on_surface = Cylinder_ImuUpdate(sample->ay_g,
                                                      sample->az_g,
                                                      sample->gx_dps,
-                                                     euler.pitch);
+                                                     euler.pitch,
+                                                     euler.yaw);
             element_update_cylinder_fan(cylinder_on_surface);
             if (Cylinder_HasExited())
                 element_complete(ELEMENT_CYLINDER);
@@ -203,7 +237,11 @@ void Element_ImuUpdate(const imu_sample_t *sample)
             break;
 
         case ELEMENT_WALL:
-            Wall_ImuUpdate(sample, euler.pitch);
+            Wall_ImuUpdate(sample, euler.pitch, euler.roll);
+            wall_state = Wall_GetState();
+            element_update_wall_fan(
+                (uint8)(wall_state == WALL_STATE_LATERAL ||
+                        wall_state == WALL_STATE_DESCENT));
             if (Wall_HasExited())
                 element_complete(ELEMENT_WALL);
             break;
@@ -246,9 +284,12 @@ void Element_PrepareControl(int16 straight_speed,
     switch ((element_type_t)element_current_type)
     {
         case ELEMENT_SEESAW:
-            *target_speed = Seesaw_GetSpeedTarget(*target_speed);
+            *target_speed = Seesaw_GetSpeedTarget(*target_speed,
+                                                  straight_speed);
             break;
         case ELEMENT_CYLINDER:
+            *target_speed = Cylinder_GetSpeedTarget(*target_speed,
+                                                    straight_speed);
             if (Cylinder_IsEntryLeftTurnGuardActive())
                 *direction_diff = Cylinder_LimitPreEntryDiff(*direction_diff);
             break;
@@ -270,7 +311,9 @@ void Element_ClampWheelTargets(int16 center_speed,
                                int16 *left_speed,
                                int16 *right_speed)
 {
-    if ((element_type_t)element_current_type == ELEMENT_WALL)
+    if ((element_type_t)element_current_type == ELEMENT_SEESAW)
+        Seesaw_ClampWheelTargets(center_speed, left_speed, right_speed);
+    else if ((element_type_t)element_current_type == ELEMENT_WALL)
         Wall_ClampWheelTargets(center_speed, left_speed, right_speed);
 }
 

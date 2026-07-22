@@ -30,6 +30,7 @@ uint8 Element_GetLapCount(void);
 uint8 Element_GetLapTarget(void);
 
 extern uint16 suction_fan_pwm_cylinder;
+extern uint16 suction_fan_pwm_wall;
 extern uint8 element_lap_target;
 
 #endif
