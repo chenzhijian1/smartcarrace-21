@@ -2,7 +2,6 @@
 #define __SEESAW_H_
 
 #include "zf_common_typedef.h"
-#include "quaternion.h"
 
 /*
  * 跷跷板识别和控制模块。
@@ -11,63 +10,44 @@
  * TIM4 的 5 ms 控制中断内读取状态，并调用下面的速度/轮速辅助函数。
  * 这里的宏只影响识别阈值或“编码器目标速度”，不直接代表 PWM 占空比。
  * 规则中的长度、宽度和高度只作为识别背景，不在本文件中参与几何计算。
- * ax/ay/az 直接取当前 IMU 换算值，单位为 g；入口和转折使用
- * 姿态解算得到的 euler.pitch，当前安装方向下负角表示车头上仰。
+ * 识别只使用姿态解算得到的 euler.pitch，当前安装方向下负角表示车头上仰。
  * 所有 *_SAMPLES 都表示去重后的有效 IMU 帧数；“5 ms”只是当前配置。
  */
 
 /* ---------- 姿态识别阈值 ---------- */
 
-#define SEESAW_TILT_ENTER_DEG             (3.0f)  // 抬起需 pitch<=-3°；下降需 pitch>=+3°。
-#define SEESAW_TILT_MIN_PEAK_DEG          (8.0f)  // 抬起阶段 |-pitch| 至少达到 8°。
-#define SEESAW_TILT_MAX_DEG               (40.0f) // |pitch| 超过 40°时撤销跷跷板候选。
-
-#define SEESAW_AZ_MIN_G                   (0.25f)//加速度 Z 轴最低分量，防止加速度模长可信但姿态已经倒置时误判。单位：g。
+#define SEESAW_RISING_ENTER_DEG           (5.0f)  // pitch<=-8°确认进入RISING。
+#define SEESAW_FALLING_ENTER_DEG          (5.0f)  // pitch>=+8°确认进入FALLING。
+#define SEESAW_TILT_EXIT_DEG              (2.0f)  // |pitch|<2°认为已经回平。
+#define SEESAW_TILT_MAX_DEG               (45.0f) // |pitch|超过45°时撤销候选。
 
 
 /* ---------- 连续帧和超时 ---------- */
-#define SEESAW_BASELINE_CONFIRM_SAMPLES   (5U)//平面起始姿态连续确认帧数。没有基线时不接受倾角候选。
-#define SEESAW_ENTER_CONFIRM_SAMPLES      (5U)//负 pitch 抬起连续确认帧数，决定何时进入 RISING。
-#define SEESAW_TREND_CONFIRM_SAMPLES      (3U)//正 pitch 下降连续确认帧数，用于确认 FALLING/ACTIVE。
-#define SEESAW_EXIT_CONFIRM_SAMPLES       (3U)//回到平面连续确认帧数，决定何时进入 EXITED。
-#define SEESAW_MAX_CANDIDATE_SAMPLES      (10U)//候选最长持续时间：10 帧约等于 50 ms（按 5 ms/帧估算）。
-#define SEESAW_NORM_INVALID_GRACE_SAMPLES (5U)//加速度模长短暂超出 0.85～1.15 g 时允许保留候选的帧数。
+#define SEESAW_ENTER_CONFIRM_SAMPLES      (3U)//pitch<=-8°连续确认帧数。
+#define SEESAW_FALL_CONFIRM_SAMPLES       (3U)//pitch>=+8°连续确认帧数。
+#define SEESAW_EXIT_CONFIRM_SAMPLES       (3U)//回平连续确认帧数。
+#define SEESAW_MAX_CANDIDATE_SAMPLES      (600U)//总看门狗，按5ms/帧约3秒。
 
 /* ---------- 第二种速度策略 ---------- */
-/* RISING 阶段的整车目标上限，占普通直线目标的百分比，不是 PWM。
+/* RISING/FALLING 阶段直接使用 normal_speed_cal 的百分比，不是 PWM。
 调小更慢、更容易等待板子落下，但可能无法越过支点；调大更快。 */
-#define SEESAW_SPEED_SLOW_PERCENT         (60U)
-
-
-
- //限制差速
-
-/* 仅用于 RISING 阶段左右轮的低速下限，单位仍是编码器目标值。
-它不会把整车中心目标从 n60 抬到 n100，只在中心目标已经不低于100时防止某一侧因差速被压得太低。需要根据电机实际起转值调整。 */
-#define SEESAW_SPEED_CRAWL_MIN            (100)
-/* RISING 阶段左右轮相对中心目标的允许范围，防止一侧反转或差速过大。 */
-#define SEESAW_SLOW_WHEEL_LOW_PERCENT     (50U)
-#define SEESAW_SLOW_WHEEL_HIGH_PERCENT    (150U)
+#define SEESAW_SPEED_SLOW_PERCENT         (35U)
 
 
 /* ---------- 状态机状态 ---------- */
 #define SEESAW_STATE_IDLE                 (0U)//未看到有效上坡。
 #define SEESAW_STATE_RISING               (1U)//已确认登板并正在上升，此时执行低速等待策略。
-#define SEESAW_STATE_FALLING              (2U)//已确认姿态从上升转为下降，此时释放低速限制。
-#define SEESAW_STATE_ACTIVE               (3U)//已确认跷跷板轨迹，但还没有稳定回到平面。
-#define SEESAW_STATE_EXITED               (4U)//已连续回平，本次跷跷板元素结束。
+#define SEESAW_STATE_FALLING              (2U)//已确认姿态从上升转为下降，继续保持35%速度。
+#define SEESAW_STATE_EXITED               (3U)//已连续回平，本次跷跷板元素结束。
 
 
 
 
 void Seesaw_Reset(void);//重置本模块状态，恢复到 IDLE。
-void Seesaw_ImuUpdate(const imu_sample_t *sample, float pitch_deg);//主循环每收到一个新IMU样本调用一次；抬起pitch<0，下降pitch>0。
+void Seesaw_ImuUpdate(float pitch_deg);//主循环每次姿态更新后调用；抬起pitch<0，下降pitch>0。
 uint8 Seesaw_HasExited(void);//返回是否已经连续回到平面。
 uint8 Seesaw_GetState(void);//返回当前状态。
 
-int16 Seesaw_GetSpeedTarget(int16 current_speed, int16 straight_speed);//供 TIM4 速度控制中断调用：RISING 时限制当前目标，其他状态原样返回。
-void Seesaw_ClampWheelTargets(int16 center_speed,
-                              int16 *left_speed,
-                              int16 *right_speed);//供 TIM4 速度控制中断调用：RISING 时限制左右轮差速，避免一侧反转。
+int16 Seesaw_GetSpeedTarget(int16 current_speed);//供 TIM4 速度控制中断调用：RISING/FALLING 返回 normal_speed_cal 的35%，其他状态原样返回。
 
 #endif /* __SEESAW_H_ */
