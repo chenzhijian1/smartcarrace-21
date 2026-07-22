@@ -1,6 +1,5 @@
 #include "headfile.h"
 #include "isr.h"
-#include "element.h"
 
 #define LED P52
 
@@ -90,10 +89,6 @@ void TM4_IRQHandler(void) interrupt TMR4_VECTOR
         (normal_speed == 0 && flag != CAR_STATE_SOFT_STOP))
     {
         suction_fan_off();
-        motor_control_stop();
-    }
-    else if (Element_IsBrakeRequested())
-    {
         motor_control_stop();
     }
     else if (flag == CAR_STATE_LAUNCH)

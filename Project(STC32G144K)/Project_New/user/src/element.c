@@ -215,8 +215,7 @@ void Element_ImuUpdate(const imu_sample_t *sample)
     switch ((element_type_t)element_current_type)
     {
         case ELEMENT_SEESAW:
-            if (!Seesaw_DebugBrakeRequested())
-                Seesaw_ImuUpdate(sample, euler.pitch);
+            Seesaw_ImuUpdate(sample, euler.pitch);
             if (Seesaw_HasExited())
                 element_complete(ELEMENT_SEESAW);
             break;
@@ -273,13 +272,6 @@ uint8 Element_IsStraightHold(void)
     return (uint8)(
         (element_type_t)element_current_type == ELEMENT_HUANDAO &&
         Huandao_DetectIsStraightHold());
-}
-
-uint8 Element_IsBrakeRequested(void)
-{
-    return (uint8)(
-        (element_type_t)element_current_type == ELEMENT_SEESAW &&
-        Seesaw_DebugBrakeRequested());
 }
 
 void Element_PrepareControl(int16 straight_speed,
