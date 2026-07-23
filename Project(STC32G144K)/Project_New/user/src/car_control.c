@@ -69,6 +69,8 @@ static uint8 flag_suction_fan_off_iap = 0;
 #define error_turn 17.0f
 uint16 suction_fan_pwm_start = 6000;
 #define LAUNCH_FAN_DELAY_TICKS   400
+#define LAUNCH_MOTOR_RAMP_TICKS  100
+#define LAUNCH_TOTAL_TICKS       (LAUNCH_FAN_DELAY_TICKS + LAUNCH_MOTOR_RAMP_TICKS)
 
 static int16 car_control_protect_cylinder_diff(int16 direction_diff)
 {
@@ -161,20 +163,37 @@ void CarControl_NormalMode(int16 c_speed, int16 s_speed) {
  *---------------------------------------------------------------------------*/
 void CarControl_LaunchMode(void) {
     uint16 fan_pwm;
+    uint16 motor_ramp_tick;
+    int16 launch_speed;
 
-    if (cnt_launch < LAUNCH_FAN_DELAY_TICKS) {
+    if (cnt_launch < LAUNCH_TOTAL_TICKS) {
         cnt_launch++;
+    }
 
+    if (cnt_launch <= LAUNCH_FAN_DELAY_TICKS) {
         if (flag_suction_fan_off == 0) {
             fan_pwm = (uint16)((uint32)suction_fan_pwm_start * cnt_launch / LAUNCH_FAN_DELAY_TICKS);
             suction_fan_on(fan_pwm);
         }
     }
+    else {
+        motor_ramp_tick = cnt_launch - LAUNCH_FAN_DELAY_TICKS;
+        launch_speed = (int16)((int32)normal_speed * motor_ramp_tick /
+                               LAUNCH_MOTOR_RAMP_TICKS);
+        normal_speed_cal = launch_speed;
+        set_leftspeed = launch_speed;
+        set_rightspeed = launch_speed;
+    }
 
-    if (cnt_launch >= LAUNCH_FAN_DELAY_TICKS) {
+    if (cnt_launch >= LAUNCH_TOTAL_TICKS) {
         cnt_launch = 0;
         flag = CAR_STATE_NORMAL;
     }
+}
+
+uint8 CarControl_LaunchMotorIsActive(void) {
+    return (uint8)(flag == CAR_STATE_LAUNCH &&
+                   cnt_launch > LAUNCH_FAN_DELAY_TICKS);
 }
 
 /*---------------------------------------------------------------------------
@@ -233,7 +252,7 @@ void CarControl_Update(void) {
 
         switch (flag) {
             case CAR_STATE_NORMAL:
-                CarControl_NormalMode(250, 1000);
+                CarControl_NormalMode(280, 1000);
                 break;
 
             case CAR_STATE_LAUNCH:
@@ -287,7 +306,7 @@ void speed_adjust(int16 c_speed, int16 s_speed) {
     changed_speed = MINMAX(changed_speed, -c_speed, c_speed);
 
     k = fabs(aaddcc.err_dir / 40.0f);
-    // k = 0;
+
     if (changed_speed > 0) {
         set_leftspeed = test_speed - changed_speed * (1 + k);
         set_rightspeed = test_speed + changed_speed;

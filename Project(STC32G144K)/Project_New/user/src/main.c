@@ -15,8 +15,8 @@ void uart_telemetry_print(void)
         case 0:
             printf("%d,", flag);
             printf("%d,%d,", motor_left.setspeed, motor_left.encoder_data);
-            printf("%d,", motor_left.duty1);
-            // printf("%d,%d,", motor_right.setspeed, motor_right.encoder_data);
+            // printf("%d,", motor_left.duty1);
+            printf("%d,%d,", motor_right.setspeed, motor_right.encoder_data);
             printf("%d,%.1f,", normal_speed, encoder_ave);
             printf("%.2f,", aaddcc.err_dir);
             printf("%d\r\n", voltage_battery_get_mv());
@@ -59,8 +59,7 @@ void uart_telemetry_print(void)
             break;
 
         case 5:
-            printf("%u,%u,%u,%u,", ad_ave[0], ad_ave[1],
-                   ad_ave[3], ad_ave[4]);
+            printf("%u,%u,%u,%u,", ad_ave[0], ad_ave[1],ad_ave[3], ad_ave[4]);
             printf("%.2f,%u,%u,", euler.pitch,
                    Cylinder_EntryIsDetected(), Cylinder_IsOnSurface());
             printf("%u,%u,%u,", Cylinder_HasExited(), pwm_fan,
@@ -98,8 +97,6 @@ void main(void)
             system_delay_ms(100);                                     // 短延时快速闪灯表示异�?
         }
     }
-
-    // suction_fan_on(9999);
 
     Quaternion_Init();
     while (imu660rc_init(IMU660RC_QUARTERNION_DISABLE))

@@ -4,6 +4,7 @@
 #define LED P52
 
 extern volatile uint8 send_flag;
+extern uint8 CarControl_LaunchMotorIsActive(void);
 uint8 cnt_send = 0;
 
 static uint8 adc_tick = 0;
@@ -91,7 +92,8 @@ void TM4_IRQHandler(void) interrupt TMR4_VECTOR
         suction_fan_off();
         motor_control_stop();
     }
-    else if (flag == CAR_STATE_LAUNCH)
+    else if (flag == CAR_STATE_LAUNCH &&
+             !CarControl_LaunchMotorIsActive())
     {
         motor_control_stop();
     }

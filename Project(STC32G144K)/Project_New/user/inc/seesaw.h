@@ -4,7 +4,7 @@
 #include "zf_common_typedef.h"
 #include "quaternion.h"
 
-#define SEESAW_TILT_ENTER_DEG             (12.0f)
+#define SEESAW_TILT_ENTER_DEG             (8.0f)
 #define SEESAW_TILT_MIN_PEAK_DEG          (15.0f)
 #define SEESAW_TILT_MAX_DEG               (90.0f)
 #define SEESAW_BASELINE_PITCH_MIN_DEG     (-8.0f)
@@ -13,7 +13,7 @@
 #define SEESAW_ENTER_CONFIRM_SAMPLES      (2U)
 #define SEESAW_MAX_CANDIDATE_SAMPLES      (20U)
 
-#define SEESAW_SPEED_SLOW_PERCENT         (75U)
+#define SEESAW_SPEED_SLOW_PERCENT         (50U)
 #define SEESAW_SPEED_CRAWL_MIN            (100)
 #define SEESAW_SLOW_WHEEL_LOW_PERCENT     (50U)
 #define SEESAW_SLOW_WHEEL_HIGH_PERCENT    (150U)

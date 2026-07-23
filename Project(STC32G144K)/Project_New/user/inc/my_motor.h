@@ -42,7 +42,7 @@
 #define SUCTION_FAN_NSLEEP      P36
 
 #define MOTOR_PWM_FREQ          17000
-#define SUCTION_FAN_PWM_FREQ    33000
+#define SUCTION_FAN_PWM_FREQ    17000
 #define MOTOR_PWM_MAX           10000
 #define MOTOR_PWM_MIN           10
 
