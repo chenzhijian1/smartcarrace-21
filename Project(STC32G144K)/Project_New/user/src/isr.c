@@ -39,7 +39,7 @@ void TM0_IRQHandler(void) interrupt TMR0_VECTOR
     
     pit_callback();
 
-    if (++adc_tick >= 2)
+    if (++adc_tick >= 1)
     {
         adc_tick = 0;
         flag_adc = 1;

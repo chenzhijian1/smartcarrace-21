@@ -10,10 +10,10 @@
 /* 赛道顺序只在这里配置，允许重复同一种元素。 */
 static const element_type_t element_route[] =
 {
-    ELEMENT_SEESAW,
-    ELEMENT_CYLINDER,
+    // ELEMENT_WALL,
     ELEMENT_HUANDAO,
-    ELEMENT_WALL,
+    ELEMENT_CYLINDER,
+    // ELEMENT_SEESAW,
 };
 
 #define ELEMENT_ROUTE_COUNT \
@@ -30,7 +30,7 @@ static uint16 element_wall_fan_applied_pwm = 0;
 uint16 suction_fan_pwm_cylinder = 6800;
 uint16 suction_fan_pwm_wall = 7200;
 /* 目标圈数，修改此值即可设置本次运行完成多少圈。 */
-uint8 element_lap_target = 1;
+uint8 element_lap_target = 2;
 
 static uint8 element_feedforward_is_allowed(void)
 {
@@ -239,7 +239,7 @@ void Element_ImuUpdate(const imu_sample_t *sample)
                                                      sample->az_g,
                                                      sample->gx_dps,
                                                      euler.pitch,
-                                                     euler.yaw);
+                                                     encoder_ave);
             element_update_cylinder_fan(cylinder_on_surface);
             if (Cylinder_HasExited())
                 element_complete(ELEMENT_CYLINDER);

@@ -11,7 +11,7 @@
 #define CYLINDER_PRE_ENTRY_OUTWARD_DIFF_MAX (160)
 #define CYLINDER_ENTRY_LEFT_GUARD_DEG        (0.0f)
 
-#define CYLINDER_GRAVITY_FF_PWM              (1600.0f)
+#define CYLINDER_GRAVITY_FF_PWM              (1700.0f)
 #define CYLINDER_TOP_SPEED_PERCENT           (100U)
 #define CYLINDER_SATURATION_PWM_THRESHOLD    (9500)
 #define CYLINDER_SATURATION_ERROR_THRESHOLD  (80)
@@ -35,7 +35,7 @@
 #define CYLINDER_EXIT_PITCH_MAX_DEG          (60.0f)
 #define CYLINDER_EXIT_AZ_MIN_G               (0.60f)
 #define CYLINDER_EXIT_IMU_CONFIRM_SAMPLES    (4U)
-#define CYLINDER_LEAVE_YAW_DELTA_DEG         (70.0f)
+#define CYLINDER_EXIT_DISTANCE               (600.0f)
 #define CYLINDER_EXIT_CONFIRM_LATCH          (30U)
 
 #define CYLINDER_TEST_AUTO_REARM_ENABLE      (1U)
@@ -50,8 +50,7 @@
 
 void Cylinder_AdcUpdate(void);
 uint8 Cylinder_ImuUpdate(float ay_g, float az_g,
-                         float gyro_x_dps, float pitch_deg,
-                         float yaw_deg);
+                         float gyro_x_dps, float pitch_deg, float encoder);
 uint8 Cylinder_EntryIsDetected(void);
 uint8 Cylinder_IsOnSurface(void);
 uint8 Cylinder_HasExited(void);

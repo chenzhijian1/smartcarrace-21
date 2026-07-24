@@ -7,7 +7,7 @@
 #include "navigation.h"
 
 #define HUANDAO_ENTER_ANGLE 60.0f
-#define HUANDAO_INSIDE_ANGLE 280.0f
+#define HUANDAO_INSIDE_ANGLE 270.0f
 #define HUANDAO_EXIT_DISTANCE 250.0f
 #define HUANDAO_ENTRY_BIAS_RATIO 0.65f
 #define HUANDAO_DETECT_CONFIRM_COUNT (3U)
@@ -30,17 +30,11 @@ enum
  *---------------------------------------------------------------------------*/
 uint8 huandao_num = 1; // 环岛数量
 uint8 huandao_count = 0;
-uint8 huandao_dir[HUANDAO_MAX_COUNT] = {1, 0, 0, 0, 0};
+uint8 huandao_dir[HUANDAO_MAX_COUNT] = {0, 0, 0, 0, 0};
 // 环岛方向数组：0 为左环（逆时针、航向角增加），1 为右环（顺时针、航向角减少）。
 uint8 huandao_dir_source[HUANDAO_MAX_COUNT] = {0, 0, 0, 0, 0};
 uint8 huandao_r[HUANDAO_MAX_COUNT] = {20, 35, 30, 30, 30};   // 环岛半径数组（单位：cm）
-float distance_before_huandao[HUANDAO_MAX_COUNT] = {200, 200, 200, 200, 200};  // 环岛前距离数组（单位：编码器）
-
-// EEPROM默认值
-static float distance_before_huandao_iap[HUANDAO_MAX_COUNT] = {200, 200, 200, 200, 200};
-static float huandao_num_iap = 1;
-static uint8 huandao_dir_iap[HUANDAO_MAX_COUNT] = {1, 0, 0, 0, 0};
-static uint8 huandao_r_iap[HUANDAO_MAX_COUNT] = {30, 35, 30, 30, 30};
+float distance_before_huandao[HUANDAO_MAX_COUNT] = {180, 200, 200, 200, 200};  // 环岛前距离数组（单位：编码器）
 
 /*---------------------------------------------------------------------------
  * 环岛状态变量
@@ -325,75 +319,6 @@ void Huandao_Reset(void) {
 /*---------------------------------------------------------------------------
  * 环岛参数初始化（从EEPROM读取）
  *---------------------------------------------------------------------------*/
-void Huandao_Init(void) {
-    // 读取环岛参数
-    distance_before_huandao[0] = Config_ReadFloat(7, 0x100) > 0 ? Config_ReadFloat(7, 0x100) : distance_before_huandao_iap[0];
-    distance_before_huandao[1] = Config_ReadFloat(7, 0x107) > 0 ? Config_ReadFloat(7, 0x107) : distance_before_huandao_iap[1];
-    distance_before_huandao[2] = Config_ReadFloat(7, 0x10e) > 0 ? Config_ReadFloat(7, 0x10e) : distance_before_huandao_iap[2];
-    distance_before_huandao[3] = Config_ReadFloat(7, 0x115) > 0 ? Config_ReadFloat(7, 0x115) : distance_before_huandao_iap[3];
-    distance_before_huandao[4] = Config_ReadFloat(7, 0x11c) > 0 ? Config_ReadFloat(7, 0x11c) : distance_before_huandao_iap[4];
-    
-    huandao_num = (uint8)(Config_ReadFloat(7, 0x13f) > 0 ? Config_ReadFloat(7, 0x13f) : huandao_num_iap);
-    if (huandao_num == 0)
-    {
-        huandao_num = 1;
-    }
-    else if (huandao_num > HUANDAO_MAX_COUNT)
-    {
-        huandao_num = HUANDAO_MAX_COUNT;
-    }
-    if (huandao_count >= huandao_num)
-    {
-        huandao_count = 0;
-    }
-    
-    // 环岛方向
-    huandao_dir[0] = (uint8)(Config_ReadFloat(7, 0x146) > 0 ? Config_ReadFloat(7, 0x146) + 0.5f : huandao_dir_iap[0]);
-    huandao_dir[1] = (uint8)(Config_ReadFloat(7, 0x14a) > 0 ? Config_ReadFloat(7, 0x14a) + 0.5f : huandao_dir_iap[1]);
-    huandao_dir[2] = (uint8)(Config_ReadFloat(7, 0x14e) > 0 ? Config_ReadFloat(7, 0x14e) + 0.5f : huandao_dir_iap[2]);
-    huandao_dir[3] = (uint8)(Config_ReadFloat(7, 0x152) > 0 ? Config_ReadFloat(7, 0x152) + 0.5f : huandao_dir_iap[3]);
-    huandao_dir[4] = (uint8)(Config_ReadFloat(7, 0x156) > 0 ? Config_ReadFloat(7, 0x156) + 0.5f : huandao_dir_iap[4]);
-    
-    // 环岛半径
-    huandao_r[0] = (uint8)(Config_ReadFloat(7, 0x15e) > 0 ? Config_ReadFloat(7, 0x15e) + 0.5f : huandao_r_iap[0]);
-    huandao_r[1] = (uint8)(Config_ReadFloat(7, 0x162) > 0 ? Config_ReadFloat(7, 0x162) + 0.5f : huandao_r_iap[1]);
-    huandao_r[2] = (uint8)(Config_ReadFloat(7, 0x166) > 0 ? Config_ReadFloat(7, 0x166) + 0.5f : huandao_r_iap[2]);
-    huandao_r[3] = (uint8)(Config_ReadFloat(7, 0x16a) > 0 ? Config_ReadFloat(7, 0x16a) + 0.5f : huandao_r_iap[3]);
-    huandao_r[4] = (uint8)(Config_ReadFloat(7, 0x16e) > 0 ? Config_ReadFloat(7, 0x16e) + 0.5f : huandao_r_iap[4]);
-
-}
-
 /*---------------------------------------------------------------------------
  * 保存环岛参数到EEPROM
  *---------------------------------------------------------------------------*/
-void Huandao_SaveConfig(void) {
-    // 更新默认值数组
-    int i;
-    for (i = 0; i < HUANDAO_MAX_COUNT; i++) {
-        distance_before_huandao_iap[i] = distance_before_huandao[i];
-        huandao_dir_iap[i] = huandao_dir[i];
-        huandao_r_iap[i] = huandao_r[i];
-    }
-    huandao_num_iap = huandao_num;
-    
-    // 写入EEPROM
-    eeprom_write_float_ascii(distance_before_huandao[0], 3, 1, 0x100);
-    eeprom_write_float_ascii(distance_before_huandao[1], 3, 1, 0x107);
-    eeprom_write_float_ascii(distance_before_huandao[2], 3, 1, 0x10e);
-    eeprom_write_float_ascii(distance_before_huandao[3], 3, 1, 0x115);
-    eeprom_write_float_ascii(distance_before_huandao[4], 3, 1, 0x11c);
-    eeprom_write_float_ascii((float)huandao_num, 3, 1, 0x13f);
-    
-    eeprom_write_float_ascii((float)huandao_dir[0], 3, 1, 0x146);
-    eeprom_write_float_ascii((float)huandao_dir[1], 3, 1, 0x14a);
-    eeprom_write_float_ascii((float)huandao_dir[2], 3, 1, 0x14e);
-    eeprom_write_float_ascii((float)huandao_dir[3], 3, 1, 0x152);
-    eeprom_write_float_ascii((float)huandao_dir[4], 3, 1, 0x156);
-    
-    eeprom_write_float_ascii((float)huandao_r[0], 3, 1, 0x15e);
-    eeprom_write_float_ascii((float)huandao_r[1], 3, 1, 0x162);
-    eeprom_write_float_ascii((float)huandao_r[2], 3, 1, 0x166);
-    eeprom_write_float_ascii((float)huandao_r[3], 3, 1, 0x16a);
-    eeprom_write_float_ascii((float)huandao_r[4], 3, 1, 0x16e);
-    
-}

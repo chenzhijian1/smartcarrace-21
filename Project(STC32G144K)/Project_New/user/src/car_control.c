@@ -63,10 +63,8 @@ static uint8 cylinder_right_diff_protected = 0;
  *---------------------------------------------------------------------------*/
 uint8 flag_suction_fan_off = 0;
 
-// EEPROM默认�?
-static uint8 flag_suction_fan_off_iap = 0;
-
-#define error_turn 17.0f
+// Legacy EEPROM parameter flow removed.
+#define error_turn 15.0f
 uint16 suction_fan_pwm_start = 6000;
 #define LAUNCH_FAN_DELAY_TICKS   400
 #define LAUNCH_MOTOR_RAMP_TICKS  100
@@ -252,7 +250,7 @@ void CarControl_Update(void) {
 
         switch (flag) {
             case CAR_STATE_NORMAL:
-                CarControl_NormalMode(280, 1000);
+                CarControl_NormalMode(280, 1200);
                 break;
 
             case CAR_STATE_LAUNCH:
@@ -291,8 +289,16 @@ uint8 car_stop_judge(void) {
 void dir_pid(float error, float last_error, float gyro) {
     int16 p_out, d_out, output;
     
-    p_out = (int16)((kpa / 10) * error + kpb * (error / error_turn) * (error / error_turn) * (error / error_turn));
-    d_out = (int16)(kd * (error - last_error)) + (int16)(kd_imu / 100.0 * gyro);
+    // p_out = (int16)((kpa / 10) * error + kpb * (error / error_turn) * (error / error_turn) * (error / error_turn));
+    // d_out = (int16)(kd * (error - last_error)) - (int16)(kd_imu / 100.0 * gyro);
+    // output = p_out + d_out;
+
+    if (fabs(error) > 1.2 * error_turn)
+        p_out = (int16)((kpa / 10) * error + 1.2 * kpb * (error / error_turn) * (error / error_turn) * (error / error_turn));
+    else
+        p_out = (int16)((kpa / 10) * error + kpb * (error / error_turn) * (error / error_turn) * (error / error_turn));
+
+    d_out = (int16)(kd * (error - last_error)) - (int16)(kd_imu / 100.0 * gyro);
     output = p_out + d_out;
 
     changed_speed = output;
@@ -305,7 +311,7 @@ void dir_pid(float error, float last_error, float gyro) {
 void speed_adjust(int16 c_speed, int16 s_speed) {
     changed_speed = MINMAX(changed_speed, -c_speed, c_speed);
 
-    k = fabs(aaddcc.err_dir / 40.0f);
+    k = fabs(aaddcc.err_dir / 30.0f);
 
     if (changed_speed > 0) {
         set_leftspeed = test_speed - changed_speed * (1 + k);
@@ -323,15 +329,6 @@ void speed_adjust(int16 c_speed, int16 s_speed) {
 /*---------------------------------------------------------------------------
  * 车辆控制参数初始化（从EEPROM读取�?
  *---------------------------------------------------------------------------*/
-void CarControl_Init(void) {
-    // 读取风扇控制标志
-    flag_suction_fan_off = (uint8)(Config_ReadFloat(7, 0x176) > 0 ? Config_ReadFloat(7, 0x176) + 0.5f : flag_suction_fan_off_iap);
-}
-
 /*---------------------------------------------------------------------------
  * 保存车辆控制参数到EEPROM
  *---------------------------------------------------------------------------*/
-void CarControl_SaveConfig(void) {
-    flag_suction_fan_off_iap = flag_suction_fan_off;
-    eeprom_write_float_ascii((float)flag_suction_fan_off, 3, 1, 0x176);
-}

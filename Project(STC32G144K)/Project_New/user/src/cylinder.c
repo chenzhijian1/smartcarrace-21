@@ -17,7 +17,7 @@ static uint16 cylinder_rearm_clear_count = 0;
 static uint8 cylinder_entry_lockout = 0;
 static uint16 cylinder_rearm_lockout_count = 0;
 static float cylinder_rotation_progress_deg = 0.0f;
-static float cylinder_yaw_leave_deg = 0.0f;
+static float cylinder_encoder_leave = 0.0f;
 
 static uint8 cylinder_climb_signal_is_present(float pitch_deg)
 {
@@ -67,8 +67,8 @@ static void cylinder_update_speed_percent(void)
     top_percent = (float)CYLINDER_TOP_SPEED_PERCENT;
     if (top_percent < 100.0f)
         top_percent = 100.0f;
-    else if (top_percent > 255.0f)
-        top_percent = 255.0f;
+    // else if (top_percent > 255.0f)
+    //     top_percent = 255.0f;
 
     if (cylinder_rotation_progress_deg <= 180.0f)
     {
@@ -91,12 +91,12 @@ static void cylinder_update_speed_percent(void)
     cylinder_speed_percent = (uint8)(speed_percent + 0.5f);
 }
 
-static void cylinder_enter_exit_straight(float yaw_deg)
+static void cylinder_enter_exit_straight(float encoder)
 {
     if (cylinder_state == CYLINDER_STATE_EXIT_STRAIGHT)
         return;
 
-    cylinder_yaw_leave_deg = yaw_deg;
+    cylinder_encoder_leave = encoder;
     cylinder_state = CYLINDER_STATE_EXIT_STRAIGHT;
     cylinder_left_guard_active = 0;
     cylinder_speed_percent = 100U;
@@ -104,7 +104,7 @@ static void cylinder_enter_exit_straight(float yaw_deg)
 
 static void cylinder_update_motion_evidence(float ay_g, float az_g,
                                              float gyro_x_dps,
-                                             float yaw_deg)
+                                             float encoder)
 {
     float gyro_x_abs;
 
@@ -150,13 +150,13 @@ static void cylinder_update_motion_evidence(float ay_g, float az_g,
         cylinder_rotation_progress_deg >=
             CYLINDER_EXIT_STRAIGHT_PROGRESS_DEG)
     {
-        cylinder_enter_exit_straight(yaw_deg);
+        cylinder_enter_exit_straight(encoder);
     }
 }
 
 static void cylinder_update_exit_pose(float gyro_x_dps,
                                       float pitch_deg, float az_g,
-                                      float yaw_deg)
+                                      float encoder)
 {
     uint8 exit_pose_present;
 
@@ -183,16 +183,16 @@ static void cylinder_update_exit_pose(float gyro_x_dps,
         return;
 
     cylinder_exit_imu_count = 0;
-    cylinder_enter_exit_straight(yaw_deg);
+    cylinder_enter_exit_straight(encoder);
 }
 
-static void cylinder_update_leave_yaw(float yaw_deg)
+static void cylinder_update_leave_encoder(float encoder)
 {
     if (cylinder_state != CYLINDER_STATE_EXIT_STRAIGHT ||
         Cylinder_HasExited())
         return;
 
-    if (yaw_deg - cylinder_yaw_leave_deg > CYLINDER_LEAVE_YAW_DELTA_DEG)
+    if (encoder - cylinder_encoder_leave > CYLINDER_EXIT_DISTANCE)
         cylinder_exit_imu_count = CYLINDER_EXIT_CONFIRM_LATCH;
 }
 
@@ -245,7 +245,7 @@ uint8 Cylinder_IsOnSurface(void)
 
 uint8 Cylinder_ImuUpdate(float ay_g, float az_g,
                          float gyro_x_dps, float pitch_deg,
-                         float yaw_deg)
+                         float encoder)
 {
     if (cylinder_state == CYLINDER_STATE_IDLE)
         return 0;
@@ -275,9 +275,9 @@ uint8 Cylinder_ImuUpdate(float ay_g, float az_g,
         return Cylinder_IsOnSurface();
     }
 
-    cylinder_update_motion_evidence(ay_g, az_g, gyro_x_dps, yaw_deg);
-    cylinder_update_exit_pose(gyro_x_dps, pitch_deg, az_g, yaw_deg);
-    cylinder_update_leave_yaw(yaw_deg);
+    cylinder_update_motion_evidence(ay_g, az_g, gyro_x_dps, encoder);
+    cylinder_update_exit_pose(gyro_x_dps, pitch_deg, az_g, encoder);
+    cylinder_update_leave_encoder(encoder);
     cylinder_update_speed_percent();
     return Cylinder_IsOnSurface();
 }
@@ -346,7 +346,7 @@ void Cylinder_Reset(void)
     cylinder_entry_lockout = 0;
     cylinder_rearm_lockout_count = 0;
     cylinder_rotation_progress_deg = 0.0f;
-    cylinder_yaw_leave_deg = 0.0f;
+    cylinder_encoder_leave = 0.0f;
     cylinder_left_guard_active = 0;
     cylinder_speed_percent = 100U;
     cylinder_state = CYLINDER_STATE_IDLE;
