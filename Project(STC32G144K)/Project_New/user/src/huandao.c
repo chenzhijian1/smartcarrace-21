@@ -9,7 +9,10 @@
 #define HUANDAO_ENTER_ANGLE 45.0f
 #define HUANDAO_INSIDE_ANGLE 260.0f
 #define HUANDAO_EXIT_DISTANCE 200.0f
-#define HUANDAO_ENTRY_BIAS_RATIO 0.65f
+#define HUANDAO_EXIT_OUTWARD_DISTANCE 70.0f
+#define HUANDAO_EXIT_OUTWARD_BIAS_RATIO 0.2f
+#define HUANDAO_EXIT_OUTWARD_BIAS_MAX 300
+#define HUANDAO_ENTRY_BIAS_RATIO 0.7f
 #define HUANDAO_ENTRY_DIFF_LIMIT 500
 #define HUANDAO_DETECT_CONFIRM_COUNT (3U)
 
@@ -256,10 +259,26 @@ static void huandao_prepare_inside_circle(void) {
 static void huandao_prepare_exit_straight(int16 straight_speed,
                                           int16 *target_speed,
                                           int16 *direction_diff) {
-    *target_speed = straight_speed;
-    *direction_diff = 0;
+    float exit_distance;
+    int16 exit_bias;
 
-    if (encoder_ave - encoder_temp < HUANDAO_EXIT_DISTANCE) {
+    exit_distance = encoder_ave - encoder_temp;
+    if (exit_distance < HUANDAO_EXIT_OUTWARD_DISTANCE) {
+        *target_speed = straight_speed;
+        exit_bias = (int16)((float)straight_speed *
+                            HUANDAO_EXIT_OUTWARD_BIAS_RATIO);
+        if (exit_bias < 0) {
+            exit_bias = -exit_bias;
+        }
+        if (exit_bias > HUANDAO_EXIT_OUTWARD_BIAS_MAX) {
+            exit_bias = HUANDAO_EXIT_OUTWARD_BIAS_MAX;
+        }
+
+        // Left circle moves outward to the right; right circle is mirrored.
+        *direction_diff = (flag_huandao == 0) ? -exit_bias : exit_bias;
+    }
+
+    if (exit_distance < HUANDAO_EXIT_DISTANCE) {
         return;
     }
 
