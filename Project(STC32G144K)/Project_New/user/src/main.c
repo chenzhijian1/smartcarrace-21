@@ -31,7 +31,7 @@ void uart_telemetry_print(void)
             break;
 
         case 2:
-            printf("%d,", flag);
+            printf("%u,", Huandao_GetState());
             printf("%.2f,%.2f,", AD_ONE[0], AD_ONE[1]);
             printf("%.2f,%.2f,", AD_ONE[3], AD_ONE[4]);
             printf("%.2f,", aaddcc.err_dir);
@@ -118,6 +118,8 @@ void main(void)
 
     pit_ms_init(TIM0_PIT, 5, TM0_IRQHandler);
     pit_ms_init(TIM4_PIT, 5, TM4_IRQHandler);
+
+    element_reverse_run = 0;
 
     while (1)
     {

@@ -207,6 +207,21 @@ static uint8 uart_command_apply(char *cmd)
             uart_feedback_hold_start();
             return 1;
 
+        case 'r':
+            if ((value != 0.0f && value != 1.0f) || normal_speed != 0)
+            {
+                applied = 0;
+                break;
+            }
+            element_reverse_run = (uint8)value;
+            Element_Init();
+            if (debug_mode)
+                printf("element_reverse_run=%u\r\n", element_reverse_run);
+            else
+                printf("element_reverse_run,%u\r\n", element_reverse_run);
+            uart_feedback_hold_start();
+            return 1;
+
         case 'l':
             if (value < 1.0f || value > 255.0f) applied = 0;
             else element_lap_target = (uint8)value;

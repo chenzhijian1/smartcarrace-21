@@ -64,7 +64,7 @@ static uint8 cylinder_right_diff_protected = 0;
 uint8 flag_suction_fan_off = 0;
 
 // Legacy EEPROM parameter flow removed.
-#define error_turn 14.0f
+#define error_turn 17.0f
 uint16 suction_fan_pwm_start = 5000;
 #define LAUNCH_FAN_DELAY_TICKS   400
 #define LAUNCH_MOTOR_RAMP_TICKS  100
@@ -129,16 +129,6 @@ static int16 car_control_protect_cylinder_diff(int16 direction_diff)
  *---------------------------------------------------------------------------*/
 void CarControl_NormalMode(int16 c_speed, int16 s_speed) {
     int16 direction_diff_limit = c_speed;
-
-    if (Element_IsStraightHold()) {
-        changed_speed = 0;
-        normal_speed_cal = normal_speed;
-        normal_speed_pre = normal_speed;
-        test_speed = normal_speed;
-        set_leftspeed = normal_speed;
-        set_rightspeed = normal_speed;
-        return;
-    }
 
     dir_pid(aaddcc.err_dir, aaddcc.last_err_dir, gyro_z);
 

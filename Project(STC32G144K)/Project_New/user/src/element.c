@@ -23,7 +23,6 @@ static volatile uint8 element_route_index = 0;
 static volatile uint8 element_current_type = ELEMENT_DONE;
 static volatile uint8 element_lap_count = 0;
 static uint8 element_cylinder_fan_boosted = 0;
-static uint16 element_cylinder_fan_applied_pwm = 0;
 static uint8 element_wall_fan_boosted = 0;
 static uint16 element_wall_fan_applied_pwm = 0;
 
@@ -31,6 +30,16 @@ uint16 suction_fan_pwm_cylinder = 6800;
 uint16 suction_fan_pwm_wall = 7200;
 /* 目标圈数，修改此值即可设置本次运行完成多少圈。 */
 uint8 element_lap_target = 2;
+uint8 element_reverse_run = 0;
+
+static element_type_t element_route_get(uint8 route_index)
+{
+    if (element_reverse_run)
+    {
+        route_index = (uint8)(ELEMENT_ROUTE_COUNT - 1U - route_index);
+    }
+    return element_route[route_index];
+}
 
 static uint8 element_feedforward_is_allowed(void)
 {
@@ -82,7 +91,6 @@ static void element_update_cylinder_fan(uint8 on_surface)
             return;
 
         element_cylinder_fan_boosted = 1;
-        element_cylinder_fan_applied_pwm = suction_fan_pwm_cylinder;
         if (suction_fan_pwm_cylinder == 0)
             suction_fan_off();
         else
@@ -90,16 +98,20 @@ static void element_update_cylinder_fan(uint8 on_surface)
     }
     else if (!on_surface && element_cylinder_fan_boosted)
     {
-        element_cylinder_fan_boosted = 0;
-
         /* 安全逻辑已关闭风机时，不在主循环中重新启动。 */
-        if (pwm_fan != element_cylinder_fan_applied_pwm ||
-            flag_suction_fan_off || voltage_battery_is_low() ||
-            (normal_speed == 0 && flag != CAR_STATE_SOFT_STOP))
+        if (flag_suction_fan_off || voltage_battery_is_low() ||
+            pwm_fan == 0)
+        {
+            element_cylinder_fan_boosted = 0;
             return;
+        }
 
-        suction_fan_on(suction_fan_pwm_start);
-        element_cylinder_fan_applied_pwm = 0;
+        if (normal_speed == 0 && flag != CAR_STATE_SOFT_STOP)
+            suction_fan_off();
+        else
+            suction_fan_on(suction_fan_pwm_start);
+
+        element_cylinder_fan_boosted = 0;
     }
 }
 
@@ -172,14 +184,15 @@ static void element_complete(element_type_t completed_type)
         else
         {
             element_route_index = 0;
-            element_current_type = (uint8)element_route[0];
+            element_current_type = (uint8)element_route_get(0);
             element_reset_type((element_type_t)element_current_type);
         }
         return;
     }
 
     element_route_index++;
-    element_current_type = (uint8)element_route[element_route_index];
+    element_current_type =
+        (uint8)element_route_get(element_route_index);
     element_reset_type((element_type_t)element_current_type);
 }
 
@@ -187,6 +200,8 @@ void Element_Init(void)
 {
     if (element_lap_target == 0)
         element_lap_target = 1;
+    element_reverse_run = (uint8)(element_reverse_run != 0);
+    Huandao_SetRouteReverse(element_reverse_run);
 
     Seesaw_Reset();
     Cylinder_Reset();
@@ -196,7 +211,6 @@ void Element_Init(void)
 
     element_lap_count = 0;
     element_cylinder_fan_boosted = 0;
-    element_cylinder_fan_applied_pwm = 0;
     element_wall_fan_boosted = 0;
     element_wall_fan_applied_pwm = 0;
     motor_set_feedforward_pwm(0);
@@ -209,7 +223,7 @@ void Element_Init(void)
     }
 
     element_route_index = 0;
-    element_current_type = (uint8)element_route[0];
+    element_current_type = (uint8)element_route_get(0);
 }
 
 void Element_ImuUpdate(const imu_sample_t *sample)
@@ -284,16 +298,6 @@ uint8 Element_AdcUpdate(void)
     return 0;
 }
 
-uint8 Element_IsStraightHold(void)
-{
-    if (!ELEMENT_ENABLE)
-        return 0;
-
-    return (uint8)(
-        (element_type_t)element_current_type == ELEMENT_HUANDAO &&
-        Huandao_DetectIsStraightHold());
-}
-
 void Element_PrepareControl(int16 straight_speed,
                             int16 *target_speed,
                             int16 *direction_diff,
@@ -364,4 +368,9 @@ uint8 Element_GetLapCount(void)
 uint8 Element_GetLapTarget(void)
 {
     return element_lap_target;
+}
+
+uint8 Element_GetReverseRun(void)
+{
+    return element_reverse_run;
 }

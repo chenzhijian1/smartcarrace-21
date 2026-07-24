@@ -7,7 +7,8 @@
 #define CONFIG_FLASH_ADDR             (0x0000UL)
 #define CONFIG_FLASH_PAGE_SIZE        (512U)
 #define CONFIG_FLASH_MAGIC            (0x43464731UL)
-#define CONFIG_FLASH_VERSION          (4U)
+#define CONFIG_FLASH_VERSION          (5U)
+#define CONFIG_FLASH_VERSION_V4       (4U)
 
 #define CONFIG_BUTTON_PIN             P35
 #define CONFIG_BUTTON_LONG_SAMPLES    (100U)
@@ -35,17 +36,44 @@ typedef struct
     float distance_before_huandao[HUANDAO_MAX_COUNT];
     uint8 element_lap_target;
     uint16 suction_fan_pwm_start;
+    uint8 element_reverse_run;
 } config_flash_t;
+
+typedef struct
+{
+    uint16 crc;
+    uint32 magic;
+    uint16 version;
+    uint16 size;
+
+    float kpa;
+    float kpb;
+    float kd;
+    float kd_imu;
+    float kp_motor;
+    float ki_motor;
+    int16 normal_speed;
+
+    float inductance_a;
+    float inductance_b;
+    float inductance_c;
+
+    float distance_before_huandao[HUANDAO_MAX_COUNT];
+    uint8 element_lap_target;
+    uint16 suction_fan_pwm_start;
+} config_flash_v4_t;
 
 typedef char config_flash_size_check[
     (sizeof(config_flash_t) <= CONFIG_FLASH_PAGE_SIZE) ? 1 : -1];
+typedef char config_flash_v4_size_check[
+    (sizeof(config_flash_v4_t) <= CONFIG_FLASH_PAGE_SIZE) ? 1 : -1];
 
 uint8 debug_mode = 0;
 
-float kpa = 70.0f;
-float kpb = 100.0f;
-float kd = 90.0f;
-float kd_imu = 30.0f;
+float kpa = 50.0f;
+float kpb = 80.0f;
+float kd = 70.0f;
+float kd_imu = 10.0f;
 
 float kp_motor = 10.0f;
 float ki_motor = 2.0f;
@@ -89,6 +117,14 @@ static uint16 Config_RecordCrc(const config_flash_t *record)
                         (uint16)(sizeof(*record) - sizeof(record->crc)));
 }
 
+static uint16 Config_RecordV4Crc(const config_flash_v4_t *record)
+{
+    const uint8 *bytes = (const uint8 *)record;
+
+    return Config_Crc16(bytes + sizeof(record->crc),
+                        (uint16)(sizeof(*record) - sizeof(record->crc)));
+}
+
 static uint8 Config_RecordIsValid(const config_flash_t *record)
 {
     uint8 i;
@@ -97,6 +133,37 @@ static uint8 Config_RecordIsValid(const config_flash_t *record)
         record->version != CONFIG_FLASH_VERSION ||
         record->size != sizeof(*record) ||
         record->crc != Config_RecordCrc(record))
+    {
+        return 0;
+    }
+
+    if (record->element_lap_target == 0 ||
+        record->element_reverse_run > 1U ||
+        record->normal_speed < 0 ||
+        record->suction_fan_pwm_start > MOTOR_PWM_MAX)
+    {
+        return 0;
+    }
+
+    for (i = 0; i < HUANDAO_MAX_COUNT; i++)
+    {
+        if (record->distance_before_huandao[i] < 0.0f)
+        {
+            return 0;
+        }
+    }
+
+    return 1;
+}
+
+static uint8 Config_RecordV4IsValid(const config_flash_v4_t *record)
+{
+    uint8 i;
+
+    if (record->magic != CONFIG_FLASH_MAGIC ||
+        record->version != CONFIG_FLASH_VERSION_V4 ||
+        record->size != sizeof(*record) ||
+        record->crc != Config_RecordV4Crc(record))
     {
         return 0;
     }
@@ -111,9 +178,7 @@ static uint8 Config_RecordIsValid(const config_flash_t *record)
     for (i = 0; i < HUANDAO_MAX_COUNT; i++)
     {
         if (record->distance_before_huandao[i] < 0.0f)
-        {
             return 0;
-        }
     }
 
     return 1;
@@ -144,6 +209,7 @@ static void Config_Capture(config_flash_t *record)
         record->distance_before_huandao[i] = distance_before_huandao[i];
     record->element_lap_target = element_lap_target;
     record->suction_fan_pwm_start = suction_fan_pwm_start;
+    record->element_reverse_run = element_reverse_run;
     record->crc = Config_RecordCrc(record);
 }
 
@@ -167,6 +233,35 @@ static void Config_Apply(const config_flash_t *record)
         distance_before_huandao[i] = record->distance_before_huandao[i];
     element_lap_target = record->element_lap_target;
     suction_fan_pwm_start = record->suction_fan_pwm_start;
+    element_reverse_run = record->element_reverse_run;
+
+    motor_left.Kp_motor = kp_motor;
+    motor_left.Ki_motor = ki_motor;
+    motor_right.Kp_motor = kp_motor;
+    motor_right.Ki_motor = ki_motor;
+}
+
+static void Config_ApplyV4(const config_flash_v4_t *record)
+{
+    uint8 i;
+
+    kpa = record->kpa;
+    kpb = record->kpb;
+    kd = record->kd;
+    kd_imu = record->kd_imu;
+    kp_motor = record->kp_motor;
+    ki_motor = record->ki_motor;
+    configured_normal_speed = record->normal_speed;
+
+    A_ = record->inductance_a;
+    B_ = record->inductance_b;
+    C_ = record->inductance_c;
+
+    for (i = 0; i < HUANDAO_MAX_COUNT; i++)
+        distance_before_huandao[i] = record->distance_before_huandao[i];
+    element_lap_target = record->element_lap_target;
+    suction_fan_pwm_start = record->suction_fan_pwm_start;
+    element_reverse_run = 0;
 
     motor_left.Kp_motor = kp_motor;
     motor_left.Ki_motor = ki_motor;
@@ -188,8 +283,21 @@ void Config_Init(void)
     }
     else
     {
-        configured_normal_speed = 0;
-        printf("config,default\r\n");
+        memset(&flash_config, 0, sizeof(flash_config));
+        iap_read_buff(CONFIG_FLASH_ADDR, (uint8 *)&flash_config,
+                      (uint16)sizeof(config_flash_v4_t));
+        if (Config_RecordV4IsValid(
+                (const config_flash_v4_t *)&flash_config))
+        {
+            Config_ApplyV4((const config_flash_v4_t *)&flash_config);
+            printf("config,load_ok,v4,reverse_default_0\r\n");
+        }
+        else
+        {
+            configured_normal_speed = 0;
+            element_reverse_run = 0;
+            printf("config,default\r\n");
+        }
     }
 }
 
@@ -230,6 +338,7 @@ static void Config_PrintAll(void)
                i, distance_before_huandao[i]);
     }
     printf("element_lap_target=%u\r\n", element_lap_target);
+    printf("element_reverse_run=%u\r\n", element_reverse_run);
     printf("suction_fan_pwm_start=%u\r\n", suction_fan_pwm_start);
     printf("CONFIG_END\r\n");
 }

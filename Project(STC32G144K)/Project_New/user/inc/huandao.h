@@ -54,9 +54,9 @@ extern uint8 flag_huandao;      // 0:左环岛, 1:右环岛
 
 // 环岛状态处理
 uint8 Huandao_DetectUpdate(void);
-uint8 Huandao_DetectIsStraightHold(void);
 void Huandao_DetectReset(void);
 uint8 Huandao_ConsumeExitEvent(void);
+void Huandao_SetRouteReverse(uint8 reverse_run);
 void Huandao_PrepareControl(int16 straight_speed,
                             int16 *target_speed,
                             int16 *direction_diff,

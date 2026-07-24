@@ -19,7 +19,6 @@ typedef enum
 void Element_Init(void);
 void Element_ImuUpdate(const imu_sample_t *sample);
 uint8 Element_AdcUpdate(void);
-uint8 Element_IsStraightHold(void);
 void Element_PrepareControl(int16 straight_speed,
                             int16 *target_speed,
                             int16 *direction_diff,
@@ -32,9 +31,11 @@ element_type_t Element_GetCurrent(void);
 uint8 Element_GetRouteIndex(void);
 uint8 Element_GetLapCount(void);
 uint8 Element_GetLapTarget(void);
+uint8 Element_GetReverseRun(void);
 
 extern uint16 suction_fan_pwm_cylinder;
 extern uint16 suction_fan_pwm_wall;
 extern uint8 element_lap_target;
+extern uint8 element_reverse_run;
 
 #endif
