@@ -352,9 +352,7 @@ void UI_KeyScan(void) {
             else if (ui.cursor == 4) flag_suction_fan_off = !flag_suction_fan_off;
             else if (ui.cursor == 7) {
                 ui.page = 4;
-                Config_SaveAll();
-                Huandao_SaveConfig();
-                CarControl_SaveConfig();
+                Config_Save();
             }
             break;
         case 1:

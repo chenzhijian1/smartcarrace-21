@@ -103,8 +103,7 @@ static void cylinder_enter_exit_straight(float encoder)
 }
 
 static void cylinder_update_motion_evidence(float ay_g, float az_g,
-                                             float gyro_x_dps,
-                                             float encoder)
+                                             float gyro_x_dps)
 {
     float gyro_x_abs;
 
@@ -145,13 +144,6 @@ static void cylinder_update_motion_evidence(float ay_g, float az_g,
         cylinder_return_half_count = 0;
     }
 
-    if (cylinder_state == CYLINDER_STATE_ON_CYLINDER &&
-        cylinder_return_half_seen &&
-        cylinder_rotation_progress_deg >=
-            CYLINDER_EXIT_STRAIGHT_PROGRESS_DEG)
-    {
-        cylinder_enter_exit_straight(encoder);
-    }
 }
 
 static void cylinder_update_exit_pose(float gyro_x_dps,
@@ -161,10 +153,10 @@ static void cylinder_update_exit_pose(float gyro_x_dps,
     uint8 exit_pose_present;
 
     exit_pose_present = (uint8)(
-        (cylinder_rotation_progress_deg >= CYLINDER_EXIT_PROGRESS_DEG ||
-         cylinder_return_half_seen) &&
+        cylinder_return_half_seen &&
+        cylinder_rotation_progress_deg >= CYLINDER_EXIT_PROGRESS_DEG &&
         spatial_absf(gyro_x_dps) <= CYLINDER_EXIT_GYRO_X_ABS_MAX_DPS &&
-        pitch_deg <= CYLINDER_EXIT_PITCH_MAX_DEG &&
+        spatial_absf(pitch_deg) <= CYLINDER_EXIT_PITCH_ABS_MAX_DEG &&
         az_g >= CYLINDER_EXIT_AZ_MIN_G);
 
     if (!exit_pose_present)
@@ -238,9 +230,7 @@ uint8 Cylinder_EntryIsDetected(void)
 
 uint8 Cylinder_IsOnSurface(void)
 {
-    return (uint8)(cylinder_state == CYLINDER_STATE_ON_CYLINDER ||
-                   (cylinder_state == CYLINDER_STATE_EXIT_STRAIGHT &&
-                    !Cylinder_HasExited()));
+    return (uint8)(cylinder_state == CYLINDER_STATE_ON_CYLINDER);
 }
 
 uint8 Cylinder_ImuUpdate(float ay_g, float az_g,
@@ -275,7 +265,7 @@ uint8 Cylinder_ImuUpdate(float ay_g, float az_g,
         return Cylinder_IsOnSurface();
     }
 
-    cylinder_update_motion_evidence(ay_g, az_g, gyro_x_dps, encoder);
+    cylinder_update_motion_evidence(ay_g, az_g, gyro_x_dps);
     cylinder_update_exit_pose(gyro_x_dps, pitch_deg, az_g, encoder);
     cylinder_update_leave_encoder(encoder);
     cylinder_update_speed_percent();

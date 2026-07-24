@@ -22,7 +22,8 @@ uint8 Element_AdcUpdate(void);
 uint8 Element_IsStraightHold(void);
 void Element_PrepareControl(int16 straight_speed,
                             int16 *target_speed,
-                            int16 *direction_diff);
+                            int16 *direction_diff,
+                            int16 *direction_diff_limit);
 void Element_ClampWheelTargets(int16 center_speed,
                                int16 *left_speed,
                                int16 *right_speed);

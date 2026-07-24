@@ -296,12 +296,14 @@ uint8 Element_IsStraightHold(void)
 
 void Element_PrepareControl(int16 straight_speed,
                             int16 *target_speed,
-                            int16 *direction_diff)
+                            int16 *direction_diff,
+                            int16 *direction_diff_limit)
 {
     if (!ELEMENT_ENABLE)
         return;
 
-    if (target_speed == (int16 *)0 || direction_diff == (int16 *)0)
+    if (target_speed == (int16 *)0 || direction_diff == (int16 *)0 ||
+        direction_diff_limit == (int16 *)0)
         return;
 
     switch ((element_type_t)element_current_type)
@@ -319,7 +321,8 @@ void Element_PrepareControl(int16 straight_speed,
         case ELEMENT_HUANDAO:
             Huandao_PrepareControl(straight_speed,
                                    target_speed,
-                                   direction_diff);
+                                   direction_diff,
+                                   direction_diff_limit);
             break;
         case ELEMENT_WALL:
             *target_speed = Wall_GetSpeedTarget(*target_speed,

@@ -6,10 +6,11 @@
 #include "quaternion.h"
 #include "navigation.h"
 
-#define HUANDAO_ENTER_ANGLE 60.0f
-#define HUANDAO_INSIDE_ANGLE 270.0f
-#define HUANDAO_EXIT_DISTANCE 250.0f
+#define HUANDAO_ENTER_ANGLE 45.0f
+#define HUANDAO_INSIDE_ANGLE 260.0f
+#define HUANDAO_EXIT_DISTANCE 200.0f
 #define HUANDAO_ENTRY_BIAS_RATIO 0.65f
+#define HUANDAO_ENTRY_DIFF_LIMIT 500
 #define HUANDAO_DETECT_CONFIRM_COUNT (3U)
 
 enum
@@ -33,8 +34,8 @@ uint8 huandao_count = 0;
 uint8 huandao_dir[HUANDAO_MAX_COUNT] = {0, 0, 0, 0, 0};
 // 环岛方向数组：0 为左环（逆时针、航向角增加），1 为右环（顺时针、航向角减少）。
 uint8 huandao_dir_source[HUANDAO_MAX_COUNT] = {0, 0, 0, 0, 0};
-uint8 huandao_r[HUANDAO_MAX_COUNT] = {20, 35, 30, 30, 30};   // 环岛半径数组（单位：cm）
-float distance_before_huandao[HUANDAO_MAX_COUNT] = {180, 200, 200, 200, 200};  // 环岛前距离数组（单位：编码器）
+uint8 huandao_r[HUANDAO_MAX_COUNT] = {18, 35, 30, 30, 30};   // 环岛半径数组（单位：cm）
+float distance_before_huandao[HUANDAO_MAX_COUNT] = {170, 200, 200, 200, 200};  // 环岛前距离数组（单位：编码器）
 
 /*---------------------------------------------------------------------------
  * 环岛状态变量
@@ -272,9 +273,11 @@ static void huandao_prepare_exit_straight(int16 straight_speed,
 
 void Huandao_PrepareControl(int16 straight_speed,
                             int16 *target_speed,
-                            int16 *direction_diff)
+                            int16 *direction_diff,
+                            int16 *direction_diff_limit)
 {
-    if (target_speed == (int16 *)0 || direction_diff == (int16 *)0)
+    if (target_speed == (int16 *)0 || direction_diff == (int16 *)0 ||
+        direction_diff_limit == (int16 *)0)
         return;
 
     switch (huandao_state)
@@ -285,6 +288,7 @@ void Huandao_PrepareControl(int16 straight_speed,
                                        direction_diff);
             break;
         case HUANDAO_STATE_ENTER_CIRCLE:
+            *direction_diff_limit = HUANDAO_ENTRY_DIFF_LIMIT;
             huandao_prepare_enter_circle(straight_speed, direction_diff);
             break;
         case HUANDAO_STATE_INSIDE_CIRCLE:

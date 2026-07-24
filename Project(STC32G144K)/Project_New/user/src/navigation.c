@@ -200,7 +200,8 @@ void read_path(void) {
     if (path_point_count > MAX_PATH_POINTS) {
         path_point_count = MAX_PATH_POINTS;
     }
-    printf("%d\r\n", path_point_count);
+    if (!debug_mode)
+        printf("%d\r\n", path_point_count);
     addr = 0x400;
 
     /* 按顺序读取各路径点数据 */
@@ -216,7 +217,8 @@ void read_path(void) {
         }
     }
     for (i = 0; i < path_point_count; i++)
-        printf("Point %d: Yaw=%.1f\r\n", i, path_points[i].yaw_absolute);
+        if (!debug_mode)
+            printf("Point %d: Yaw=%.1f\r\n", i, path_points[i].yaw_absolute);
 
     // 读取完成后，设置相关状态
     record_state = RECORD_COMPLETE;

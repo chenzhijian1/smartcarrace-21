@@ -59,7 +59,8 @@ void Huandao_DetectReset(void);
 uint8 Huandao_ConsumeExitEvent(void);
 void Huandao_PrepareControl(int16 straight_speed,
                             int16 *target_speed,
-                            int16 *direction_diff);
+                            int16 *direction_diff,
+                            int16 *direction_diff_limit);
 huandao_state_t Huandao_GetState(void);
 
 // 辅助函数

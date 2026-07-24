@@ -65,7 +65,7 @@ uint8 flag_suction_fan_off = 0;
 
 // Legacy EEPROM parameter flow removed.
 #define error_turn 15.0f
-uint16 suction_fan_pwm_start = 6000;
+uint16 suction_fan_pwm_start = 5000;
 #define LAUNCH_FAN_DELAY_TICKS   400
 #define LAUNCH_MOTOR_RAMP_TICKS  100
 #define LAUNCH_TOTAL_TICKS       (LAUNCH_FAN_DELAY_TICKS + LAUNCH_MOTOR_RAMP_TICKS)
@@ -128,6 +128,8 @@ static int16 car_control_protect_cylinder_diff(int16 direction_diff)
  * 正常循迹模式 (flag=0)
  *---------------------------------------------------------------------------*/
 void CarControl_NormalMode(int16 c_speed, int16 s_speed) {
+    int16 direction_diff_limit = c_speed;
+
     if (Element_IsStraightHold()) {
         changed_speed = 0;
         normal_speed_cal = normal_speed;
@@ -145,13 +147,16 @@ void CarControl_NormalMode(int16 c_speed, int16 s_speed) {
 
     normal_speed_pre = normal_speed;
     test_speed = (int16)normal_speed_cal;
-    Element_PrepareControl(normal_speed, &test_speed, &changed_speed);
+    Element_PrepareControl(normal_speed,
+                           &test_speed,
+                           &changed_speed,
+                           &direction_diff_limit);
 
     // if (flag_key_fast == 1) {
     //     speed_adjust(120, 600);
     // }
     // else {
-        speed_adjust(c_speed, s_speed);
+        speed_adjust(direction_diff_limit, s_speed);
         Element_ClampWheelTargets(test_speed, &set_leftspeed, &set_rightspeed);
     // }
 }
@@ -250,7 +255,7 @@ void CarControl_Update(void) {
 
         switch (flag) {
             case CAR_STATE_NORMAL:
-                CarControl_NormalMode(280, 1200);
+                CarControl_NormalMode(270, 1200);
                 break;
 
             case CAR_STATE_LAUNCH:

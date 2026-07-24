@@ -9,6 +9,8 @@ uint16 pwm_fan = 0;
 static volatile int16 motor_feedforward_pwm[2] = {0, 0};
 static volatile uint8 motor_feedforward_active_index = 0;
 
+#define MOTOR_PID_I_LIMIT 8000.0f
+
 static uint16 motor_pwm_abs(int pwm)
 {
     if (pwm < 0)
@@ -173,11 +175,11 @@ void motor_right_set_direction(motor_dir_e dir)
 {
     if (dir == MOTOR_FORWARD)
     {
-        MOTOR_RIGHT_DIR = 1;
+        MOTOR_RIGHT_DIR = 0;
     }
     else
     {
-        MOTOR_RIGHT_DIR = 0;
+        MOTOR_RIGHT_DIR = 1;
     }
 }
 
@@ -228,23 +230,46 @@ void motor_right_control(int pwm)
 static int16 motor_closed_loop_control_with_feedforward(
     motor_struct *sptr, int16 pwm_feedforward)
 {
-    int tspeed;
     int pid_min;
     int pid_max;
+    float i_candidate;
+    float i_increment;
+    float pid_increment;
+    float pid_output;
 
     sptr->err = sptr->setspeed - sptr->encoder_data;
 
-    tspeed = (int16)(sptr->Kp_motor * (sptr->err - sptr->err1) +
-                     sptr->Ki_motor * sptr->err +
-                     sptr->Kd_motor * (sptr->err - 2 * sptr->err1 + sptr->err2));
-
-    sptr->err2 = sptr->err1;
-    sptr->err1 = sptr->err;
+    sptr->out_p = sptr->Kp_motor * (sptr->err - sptr->err1);
+    sptr->out_d = sptr->Kd_motor *
+                  (sptr->err - 2 * sptr->err1 + sptr->err2);
 
     pid_min = -MOTOR_PWM_MAX - pwm_feedforward;
     pid_max = MOTOR_PWM_MAX - pwm_feedforward;
-    sptr->out_motor_pid = MINMAX(
-        sptr->out_motor_pid + tspeed, pid_min, pid_max);
+
+    i_candidate = MINMAX(sptr->out_i + sptr->Ki_motor * sptr->err,
+                         -MOTOR_PID_I_LIMIT,
+                         MOTOR_PID_I_LIMIT);
+    i_increment = i_candidate - sptr->out_i;
+    pid_increment = sptr->out_p + i_increment + sptr->out_d;
+    pid_output = sptr->out_motor_pid + pid_increment;
+
+    /* Do not integrate further into PWM saturation; allow recovery out of it. */
+    if ((pid_output > pid_max && i_increment > 0.0f) ||
+        (pid_output < pid_min && i_increment < 0.0f))
+    {
+        i_increment = 0.0f;
+        pid_increment = sptr->out_p + sptr->out_d;
+    }
+    else
+    {
+        sptr->out_i = i_candidate;
+    }
+
+    pid_output = sptr->out_motor_pid + pid_increment;
+    sptr->out_motor_pid = MINMAX(pid_output, pid_min, pid_max);
+
+    sptr->err2 = sptr->err1;
+    sptr->err1 = sptr->err;
 
     return sptr->out_motor_pid;
 }
