@@ -41,6 +41,7 @@ static void uart_command_print_result(char command)
             case 'a': printf("kpa=%.2f\r\n", kpa); break;
             case 'b': printf("kpb=%.2f\r\n", kpb); break;
             case 'd': printf("kd=%.2f\r\n", kd); break;
+            case 'D': printf("kd_imu=%.2f\r\n", kd_imu); break;
             case 'p': printf("kp_motor=%.2f\r\n", kp_motor); break;
             case 'i': printf("ki_motor=%.2f\r\n", ki_motor); break;
             case 'n': printf("normal_speed=%d\r\n", normal_speed); break;

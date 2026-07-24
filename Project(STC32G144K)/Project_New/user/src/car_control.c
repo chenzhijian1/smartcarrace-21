@@ -64,8 +64,8 @@ static uint8 cylinder_right_diff_protected = 0;
 uint8 flag_suction_fan_off = 0;
 
 // Legacy EEPROM parameter flow removed.
-#define error_turn 15.0f
-uint16 suction_fan_pwm_start = 4500;
+#define error_turn 14.0f
+uint16 suction_fan_pwm_start = 5000;
 #define LAUNCH_FAN_DELAY_TICKS   400
 #define LAUNCH_MOTOR_RAMP_TICKS  100
 #define LAUNCH_TOTAL_TICKS       (LAUNCH_FAN_DELAY_TICKS + LAUNCH_MOTOR_RAMP_TICKS)

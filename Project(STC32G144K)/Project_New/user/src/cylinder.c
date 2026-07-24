@@ -24,6 +24,7 @@ static uint8 cylinder_climb_signal_is_present(float pitch_deg)
     return (uint8)(pitch_deg < CYLINDER_ENTRY_PITCH_MAX_DEG);
 }
 
+#if !CYLINDER_PITCH_ONLY_ENTRY_ENABLE
 static uint8 cylinder_entry_signal_is_present(void)
 {
     uint16 horizontal_sum = ad_ave[0] + ad_ave[4];
@@ -51,6 +52,7 @@ static void cylinder_update_entry_lockout(uint8 entry_signal_present)
         cylinder_rearm_lockout_count = 0;
     }
 }
+#endif
 #endif
 
 static void cylinder_update_speed_percent(void)
@@ -198,6 +200,9 @@ static void cylinder_try_auto_rearm(void)
 
 void Cylinder_AdcUpdate(void)
 {
+#if CYLINDER_PITCH_ONLY_ENTRY_ENABLE
+    return;
+#else
     uint8 entry_signal_present;
 
     entry_signal_present = cylinder_entry_signal_is_present();
@@ -217,6 +222,7 @@ void Cylinder_AdcUpdate(void)
 
     cylinder_state = CYLINDER_STATE_PRE_ENTRY;
     cylinder_left_guard_active = 1;
+#endif
 }
 
 uint8 Cylinder_EntryIsDetected(void)
@@ -234,7 +240,22 @@ uint8 Cylinder_ImuUpdate(float ay_g, float az_g,
                          float encoder)
 {
     if (cylinder_state == CYLINDER_STATE_IDLE)
+    {
+#if CYLINDER_PITCH_ONLY_ENTRY_ENABLE
+        if (spatial_confirm_update(
+                cylinder_climb_signal_is_present(pitch_deg),
+                CYLINDER_CLIMB_CONFIRM_SAMPLES,
+                &cylinder_climb_count))
+        {
+            cylinder_state = CYLINDER_STATE_ON_CYLINDER;
+            cylinder_climb_count = 0;
+            cylinder_left_guard_active = 0;
+        }
+        return Cylinder_IsOnSurface();
+#else
         return 0;
+#endif
+    }
 
     if (Cylinder_HasExited())
     {

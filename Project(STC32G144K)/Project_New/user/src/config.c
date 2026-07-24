@@ -7,7 +7,7 @@
 #define CONFIG_FLASH_ADDR             (0x0000UL)
 #define CONFIG_FLASH_PAGE_SIZE        (512U)
 #define CONFIG_FLASH_MAGIC            (0x43464731UL)
-#define CONFIG_FLASH_VERSION          (3U)
+#define CONFIG_FLASH_VERSION          (4U)
 
 #define CONFIG_BUTTON_PIN             P35
 #define CONFIG_BUTTON_LONG_SAMPLES    (100U)
@@ -23,6 +23,7 @@ typedef struct
     float kpa;
     float kpb;
     float kd;
+    float kd_imu;
     float kp_motor;
     float ki_motor;
     int16 normal_speed;
@@ -41,10 +42,10 @@ typedef char config_flash_size_check[
 
 uint8 debug_mode = 0;
 
-float kpa = 30.0f;
-float kpb = 150.0f;
-float kd = 80.0f;
-float kd_imu = 20.0f;
+float kpa = 70.0f;
+float kpb = 100.0f;
+float kd = 90.0f;
+float kd_imu = 30.0f;
 
 float kp_motor = 10.0f;
 float ki_motor = 2.0f;
@@ -130,6 +131,7 @@ static void Config_Capture(config_flash_t *record)
     record->kpa = kpa;
     record->kpb = kpb;
     record->kd = kd;
+    record->kd_imu = kd_imu;
     record->kp_motor = kp_motor;
     record->ki_motor = ki_motor;
     record->normal_speed = configured_normal_speed;
@@ -152,6 +154,7 @@ static void Config_Apply(const config_flash_t *record)
     kpa = record->kpa;
     kpb = record->kpb;
     kd = record->kd;
+    kd_imu = record->kd_imu;
     kp_motor = record->kp_motor;
     ki_motor = record->ki_motor;
     configured_normal_speed = record->normal_speed;
@@ -216,7 +219,8 @@ static void Config_PrintAll(void)
     uint8 i;
 
     printf("CONFIG_BEGIN,v%u\r\n", CONFIG_FLASH_VERSION);
-    printf("kpa=%.2f,kpb=%.2f,kd=%.2f\r\n", kpa, kpb, kd);
+    printf("kpa=%.2f,kpb=%.2f,kd=%.2f,kd_imu=%.2f\r\n",
+           kpa, kpb, kd, kd_imu);
     printf("kp_motor=%.2f,ki_motor=%.2f\r\n", kp_motor, ki_motor);
     printf("normal_speed=%d\r\n", configured_normal_speed);
     printf("A=%.3f,B=%.3f,C=%.3f\r\n", A_, B_, C_);
