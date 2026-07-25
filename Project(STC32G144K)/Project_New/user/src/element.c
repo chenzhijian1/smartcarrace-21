@@ -22,11 +22,9 @@ static const element_type_t element_route[] =
 static volatile uint8 element_route_index = 0;
 static volatile uint8 element_current_type = ELEMENT_DONE;
 static volatile uint8 element_lap_count = 0;
-static uint8 element_cylinder_fan_boosted = 0;
 static uint8 element_wall_fan_boosted = 0;
 static uint16 element_wall_fan_applied_pwm = 0;
 
-uint16 suction_fan_pwm_cylinder = 6800;
 uint16 suction_fan_pwm_wall = 7200;
 /* 目标圈数，修改此值即可设置本次运行完成多少圈。 */
 uint8 element_lap_target = 2;
@@ -69,9 +67,6 @@ static void element_update_gravity_feedforward(void)
 
     switch ((element_type_t)element_current_type)
     {
-        case ELEMENT_CYLINDER:
-            feedforward_pwm = Cylinder_CalcGravityFeedforward(pitch_sin);
-            break;
         case ELEMENT_WALL:
             feedforward_pwm = Wall_CalcGravityFeedforward(pitch_sin);
             break;
@@ -80,39 +75,6 @@ static void element_update_gravity_feedforward(void)
     }
 
     motor_set_feedforward_pwm(feedforward_pwm);
-}
-
-// 圆筒加大负压控制逻辑
-static void element_update_cylinder_fan(uint8 on_surface)
-{
-    if (on_surface && !element_cylinder_fan_boosted)
-    {
-        if (pwm_fan == 0 || flag_suction_fan_off)
-            return;
-
-        element_cylinder_fan_boosted = 1;
-        if (suction_fan_pwm_cylinder == 0)
-            suction_fan_off();
-        else
-            suction_fan_on(suction_fan_pwm_cylinder);
-    }
-    else if (!on_surface && element_cylinder_fan_boosted)
-    {
-        /* 安全逻辑已关闭风机时，不在主循环中重新启动。 */
-        if (flag_suction_fan_off || voltage_battery_is_low() ||
-            pwm_fan == 0)
-        {
-            element_cylinder_fan_boosted = 0;
-            return;
-        }
-
-        if (normal_speed == 0 && flag != CAR_STATE_SOFT_STOP)
-            suction_fan_off();
-        else
-            suction_fan_on(suction_fan_pwm_start);
-
-        element_cylinder_fan_boosted = 0;
-    }
 }
 
 static void element_update_wall_fan(uint8 on_surface)
@@ -172,6 +134,7 @@ static void element_complete(element_type_t completed_type)
         return;
 
     motor_set_feedforward_pwm(0);
+    element_reset_type(completed_type);
 
     if ((uint8)(element_route_index + 1U) >= ELEMENT_ROUTE_COUNT)
     {
@@ -210,7 +173,6 @@ void Element_Init(void)
     Wall_Reset();
 
     element_lap_count = 0;
-    element_cylinder_fan_boosted = 0;
     element_wall_fan_boosted = 0;
     element_wall_fan_applied_pwm = 0;
     motor_set_feedforward_pwm(0);
@@ -228,7 +190,6 @@ void Element_Init(void)
 
 void Element_ImuUpdate(const imu_sample_t *sample)
 {
-    uint8 cylinder_on_surface;
     uint8 wall_state;
 
     if (!ELEMENT_ENABLE)
@@ -249,12 +210,7 @@ void Element_ImuUpdate(const imu_sample_t *sample)
             break;
 
         case ELEMENT_CYLINDER:
-            cylinder_on_surface = Cylinder_ImuUpdate(sample->ay_g,
-                                                     sample->az_g,
-                                                     sample->gx_dps,
-                                                     euler.pitch,
-                                                     encoder_ave);
-            element_update_cylinder_fan(cylinder_on_surface);
+            Cylinder_ImuUpdate(euler.pitch);
             if (Cylinder_HasExited())
                 element_complete(ELEMENT_CYLINDER);
             break;
@@ -286,12 +242,6 @@ uint8 Element_AdcUpdate(void)
     if (!ELEMENT_ENABLE)
         return 0;
 
-    if ((element_type_t)element_current_type == ELEMENT_CYLINDER)
-    {
-        Cylinder_AdcUpdate();
-        return 0;
-    }
-
     if ((element_type_t)element_current_type == ELEMENT_HUANDAO)
         return Huandao_DetectUpdate();
 
@@ -315,12 +265,6 @@ void Element_PrepareControl(int16 straight_speed,
         case ELEMENT_SEESAW:
             *target_speed = Seesaw_GetSpeedTarget(*target_speed,
                                                   straight_speed);
-            break;
-        case ELEMENT_CYLINDER:
-            *target_speed = Cylinder_GetSpeedTarget(*target_speed,
-                                                    straight_speed);
-            if (Cylinder_IsEntryLeftTurnGuardActive())
-                *direction_diff = Cylinder_LimitPreEntryDiff(*direction_diff);
             break;
         case ELEMENT_HUANDAO:
             Huandao_PrepareControl(straight_speed,

@@ -6,14 +6,14 @@
 #include "quaternion.h"
 #include "navigation.h"
 
-#define HUANDAO_ENTER_ANGLE 45.0f
-#define HUANDAO_INSIDE_ANGLE 260.0f
+#define HUANDAO_ENTER_ANGLE 25.0f
+#define HUANDAO_INSIDE_ANGLE 280.0f
 #define HUANDAO_EXIT_DISTANCE 200.0f
 #define HUANDAO_EXIT_OUTWARD_DISTANCE 70.0f
 #define HUANDAO_EXIT_OUTWARD_BIAS_RATIO 0.2f
 #define HUANDAO_EXIT_OUTWARD_BIAS_MAX 300
-#define HUANDAO_ENTRY_BIAS_RATIO 0.7f
-#define HUANDAO_ENTRY_DIFF_LIMIT 500
+#define HUANDAO_ENTRY_BIAS_RATIO 0.3f
+#define HUANDAO_ENTRY_DIFF_LIMIT 300
 #define HUANDAO_DETECT_CONFIRM_COUNT (3U)
 
 enum
@@ -37,7 +37,7 @@ uint8 huandao_dir[HUANDAO_MAX_COUNT] = {0, 0, 0, 0, 0};
 // 环岛方向数组：0 为左环（逆时针、航向角增加），1 为右环（顺时针、航向角减少）。
 uint8 huandao_dir_source[HUANDAO_MAX_COUNT] = {0, 0, 0, 0, 0};
 uint8 huandao_r[HUANDAO_MAX_COUNT] = {18, 30, 30, 30, 30};   // 环岛半径数组（单位：cm）
-float distance_before_huandao[HUANDAO_MAX_COUNT] = {170, 200, 200, 200, 200};  // 环岛前距离数组（单位：编码器）
+float distance_before_huandao[HUANDAO_MAX_COUNT] = {130, 200, 200, 200, 200};  // 环岛前距离数组（单位：编码器）
 
 /*---------------------------------------------------------------------------
  * 环岛状态变量
@@ -49,7 +49,7 @@ static float huandao_enter_start_yaw = 0.0f;
 static float huandao_inside_start_yaw = 0.0f;
 
 static volatile uint8 huandao_detect_state = HUANDAO_DETECT_NORMAL;
-static float huandao_confirm_h_threshold = 70.0f;
+static float huandao_confirm_h_threshold = 60.0f;
 static float huandao_rearm_h_threshold = 30.0f;
 
 static uint8 huandao_left_count = 0;

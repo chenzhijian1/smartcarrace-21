@@ -201,12 +201,6 @@ static uint8 uart_command_apply(char *cmd)
             uart_feedback_hold_start();
             return 1;
 
-        case 'v':
-            suction_fan_pwm_cylinder = (uint16)motor_pwm_limit((int)value);
-            if (!debug_mode) printf("fan_cylinder,%d\r\n", suction_fan_pwm_cylinder);
-            uart_feedback_hold_start();
-            return 1;
-
         case 'r':
             if ((value != 0.0f && value != 1.0f) || normal_speed != 0)
             {

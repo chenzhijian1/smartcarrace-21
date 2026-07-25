@@ -7,6 +7,7 @@
 
 volatile uint8 send_flag = 1;
 uint8 uart_output_mode = 0;
+static imu_sample_t imu_sample;
 
 void uart_telemetry_print(void)
 {
@@ -61,9 +62,7 @@ void uart_telemetry_print(void)
         case 5:
             printf("%u,%u,%u,%u,", ad_ave[0], ad_ave[1],ad_ave[3], ad_ave[4]);
             printf("%.2f,%u,%u,", euler.pitch,
-                   Cylinder_EntryIsDetected(), Cylinder_IsOnSurface());
-            printf("%u,%u,%u,", Cylinder_HasExited(), pwm_fan,
-                   suction_fan_pwm_cylinder);
+                   Cylinder_GetState(), pwm_fan);
             printf("%d\r\n", motor_get_feedforward_pwm());
             break;
         default:
@@ -74,8 +73,6 @@ void uart_telemetry_print(void)
 
 void main(void)
 {
-    static imu_sample_t imu_sample;
-
     clock_init(SYSTEM_CLOCK_96M);
     debug_init();
     interrupt_global_enable();
