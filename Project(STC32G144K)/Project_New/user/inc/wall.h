@@ -44,8 +44,8 @@
 /* ---------- 墙面速度策略 ---------- */
 /* 这些参数是普通直线目标的阶段目标百分比，不是 PWM；墙面活跃时可主动加速到该目标。 */
 #define WALL_CLIMB_SPEED_PERCENT            (100U)//上坡阶段目标为普通直线目标的120%。
-#define WALL_LATERAL_SPEED_PERCENT          (125U)//横向阶段目标为普通直线目标的120%。
-#define WALL_DESCENT_SPEED_PERCENT          (150U)//下坡阶段目标为普通直线目标的120%。
+#define WALL_LATERAL_SPEED_PERCENT          (100U)//横向阶段目标为普通直线目标的120%。
+#define WALL_DESCENT_SPEED_PERCENT          (130U)//下坡阶段目标为普通直线目标的120%。
 
 #define WALL_GRAVITY_FF_PWM                (1600.0f)
 

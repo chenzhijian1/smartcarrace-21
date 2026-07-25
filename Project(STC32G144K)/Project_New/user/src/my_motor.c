@@ -210,7 +210,7 @@ static void motor_right_hw_control(int pwm)
 void motor_left_control(int pwm)
 {
 #if CAR_REVERSED_RUN
-    motor_right_hw_control(pwm);
+    motor_right_hw_control(-pwm);
 #else
     motor_left_hw_control(pwm);
 #endif

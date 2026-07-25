@@ -67,7 +67,7 @@ uint8 flag_suction_fan_off = 0;
 static uint8 flag_suction_fan_off_iap = 0;
 
 #define error_turn 17.0f
-uint16 suction_fan_pwm_start = 5800;
+uint16 suction_fan_pwm_start = 00;
 #define LAUNCH_FAN_DELAY_TICKS   400
 
 static int16 car_control_protect_cylinder_diff(int16 direction_diff)

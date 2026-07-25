@@ -144,12 +144,14 @@ void main(void)
     // Config_Init();
     // Huandao_Init();
     // CarControl_Init();
-    /*
+  /*
+    
 while(1)
 {
      motor_left_control(2000);
      motor_right_control(2000);
-}*/
+}
+*/
 
 
     normal_speed = 0;

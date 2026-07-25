@@ -24,7 +24,7 @@
 
 
 /* ---------- 连续帧和超时 ---------- */
-#define SEESAW_BASELINE_CONFIRM_SAMPLES   (3U)//平面起始姿态连续确认帧数。没有基线时不接受倾角候选。
+#define SEESAW_BASELINE_CONFIRM_SAMPLES   (2U)//平面起始姿态连续确认帧数。没有基线时不接受倾角候选。
 #define SEESAW_ENTER_CONFIRM_SAMPLES      (2U)//负 pitch 抬起连续确认帧数，决定何时进入 RISING。
 #define SEESAW_MAX_CANDIDATE_SAMPLES      (20U)//候选最长：20帧，超时直接判定元素通过
 
@@ -32,7 +32,7 @@
 /* ---------- 第二种速度策略 ---------- */
 /* RISING 阶段的整车目标上限，占普通直线目标的百分比，不是 PWM。
 调小更慢、更容易等待板子落下，但可能无法越过支点；调大更快。 */
-#define SEESAW_SPEED_SLOW_PERCENT         (75U)
+#define SEESAW_SPEED_SLOW_PERCENT         (20U)
 
 
 

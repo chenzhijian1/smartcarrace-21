@@ -26,7 +26,7 @@ uint8 huandao_dir[HUANDAO_MAX_COUNT] = {1, 0, 0, 0, 0};
 // 环岛方向数组：0 为左环（逆时针、航向角增加），1 为右环（顺时针、航向角减少）。
 uint8 huandao_dir_source[HUANDAO_MAX_COUNT] = {0, 0, 0, 0, 0};
 uint8 huandao_r[HUANDAO_MAX_COUNT] = {20, 35, 30, 30, 30};   // 环岛半径数组（单位：cm）
-float distance_before_huandao[HUANDAO_MAX_COUNT] = {200, 200, 200, 200, 200};  // 环岛前距离数组（单位：编码器）
+float distance_before_huandao[HUANDAO_MAX_COUNT] = {230, 230, 230, 230, 230};  // 环岛前距离数组（单位：编码器）
 
 // EEPROM默认值
 static float distance_before_huandao_iap[HUANDAO_MAX_COUNT] = {200, 200, 200, 200, 200};
