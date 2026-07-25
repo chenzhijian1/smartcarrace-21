@@ -21,7 +21,7 @@ uint8 debug_mode = 0;
 float kpa = 50.0f;
 float kpb = 70.0f;
 float kd = 80.0f;
-float kd_imu = 10.0f;
+float kd_imu = 30.0f;
 
 /*---------------------------------------------------------------------------
  * 电机速度环PID参数

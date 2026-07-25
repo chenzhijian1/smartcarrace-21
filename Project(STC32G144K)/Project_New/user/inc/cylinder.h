@@ -21,7 +21,7 @@
 #define CYLINDER_PRE_ENTRY_OUTWARD_DIFF_MAX  (160) /* 允许向右修正的最大差速 */
 #define CYLINDER_ENTRY_LEFT_GUARD_DEG         (0.0f) /* 入口左转保护解除角度，进度到达后允许左转 */
 
-#define CYLINDER_GRAVITY_FF_PWM                (1700.0f) /* 圆筒重力前馈PWM基值 */
+#define CYLINDER_GRAVITY_FF_PWM                (1650.0f) /* 圆筒重力前馈PWM基值 */
 #define CYLINDER_TOP_SPEED_PERCENT             (100U)    /* 圆筒顶部目标为普通设定速度的120% */
 #define CYLINDER_SATURATION_PWM_THRESHOLD      (9500)    /* 电机饱和检测：PWM占空比阈值 */
 #define CYLINDER_SATURATION_ERROR_THRESHOLD    (80)      /* 电机饱和检测：误差阈值 */
@@ -29,7 +29,7 @@
 #define CYLINDER_SATURATION_DIFF_PERCENT       (90L)     /* 电机饱和后保留的差速百分比（90%） */
 
 /* 开始登筒：车辆pitch连续小于-5度。 */
-#define CYLINDER_ENTRY_PITCH_MAX_DEG          (-5.0f)
+#define CYLINDER_ENTRY_PITCH_MAX_DEG          (-15.0f)
 #define CYLINDER_CLIMB_CONFIRM_SAMPLES       (3U)     /* 5帧约7.5cm */
 
 /* 不依赖陀螺积分的后备位置特征：顶部az为负，后半圈ay为正。 */
