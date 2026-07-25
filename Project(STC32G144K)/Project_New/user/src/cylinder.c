@@ -1,4 +1,5 @@
 #include "cylinder.h"
+#include "car_control.h"
 #include "inductance.h"
 #include "spatial_features.h"
 
@@ -30,7 +31,7 @@ static uint16 cylinder_rearm_lockout_count = 0;
 
 /* 圆筒位置判定使用的粗略运动进度，不属于桶面转向控制器输出。 */
 static float cylinder_rotation_progress_deg = 0.0f; /* |gyro_x|积分，0到360度 */
-static float cylinder_yaw_leave_deg = 0.0f;         /* 首次进入状态3时的连续航向角 */
+static float cylinder_exit_start_encoder = 0.0f;    /* 首次进入状态3时的累计编码器值 */
 
 static volatile int16 cylinder_gravity_ff_pwm[2] = {0, 0};
 static volatile uint8 cylinder_gravity_ff_active_index = 0;
@@ -76,13 +77,13 @@ static void cylinder_update_speed_percent(void)
     cylinder_speed_percent = (uint8)(speed_percent + 0.5f);
 }
 
-/* 状态3的入口统一在这里处理，避免不同进入路径重复覆盖yaw_leave。 */
-static void cylinder_enter_exit_straight(float yaw_deg)
+/* 状态3的入口统一在这里处理，避免不同进入路径重复覆盖编码器起点。 */
+static void cylinder_enter_exit_straight(void)
 {
     if (cylinder_state == CYLINDER_STATE_EXIT_STRAIGHT)
         return;
 
-    cylinder_yaw_leave_deg = yaw_deg;
+    cylinder_exit_start_encoder = encoder_ave;
     cylinder_state = CYLINDER_STATE_EXIT_STRAIGHT;
     cylinder_left_guard_active = 0;
     cylinder_speed_percent = 100U;
@@ -122,8 +123,7 @@ static void cylinder_update_entry_lockout(uint8 entry_signal_present)
 
 /* 更新陀螺积分、顶部证据、后半圈证据和出口直道阶段。 */
 static void cylinder_update_motion_evidence(float ay_g, float az_g,
-                                             float gyro_x_dps,
-                                             float yaw_deg)
+                                             float gyro_x_dps)
 {
     float gyro_x_abs;
 
@@ -175,14 +175,13 @@ static void cylinder_update_motion_evidence(float ay_g, float az_g,
         cylinder_rotation_progress_deg >=
             CYLINDER_EXIT_STRAIGHT_PROGRESS_DEG)
     {
-        cylinder_enter_exit_straight(yaw_deg);
+        cylinder_enter_exit_straight();
     }
 }
 
-/* 出口姿态连续确认后进入状态3，最终完成由状态3中的航向变化决定。 */
+/* 出口姿态连续确认后进入状态3，最终完成由状态3后的编码器距离决定。 */
 static void cylinder_update_exit_pose(float gyro_x_dps,
-                                      float pitch_deg, float az_g,
-                                      float yaw_deg)
+                                      float pitch_deg, float az_g)
 {
     uint8 exit_pose_present;
 
@@ -210,18 +209,18 @@ static void cylinder_update_exit_pose(float gyro_x_dps,
         return;
 
     cylinder_exit_imu_count = 0;
-    cylinder_enter_exit_straight(yaw_deg);
+    cylinder_enter_exit_straight();
 }
 
-/* 离开圆筒后继续保持状态3；正向转过70度才解除元素锁存。 */
-static void cylinder_update_leave_yaw(float yaw_deg)
+/* 离开圆筒后继续保持状态3；编码器前进差值达到阈值才解除元素锁存。 */
+static void cylinder_update_leave_distance(void)
 {
     if (cylinder_state != CYLINDER_STATE_EXIT_STRAIGHT ||
         Cylinder_HasExited())
         return;
 
-    if (yaw_deg - cylinder_yaw_leave_deg >
-        CYLINDER_LEAVE_YAW_DELTA_DEG)
+    if (encoder_ave - cylinder_exit_start_encoder >=
+        CYLINDER_LEAVE_ENCODER_DELTA)
     {
         cylinder_exit_imu_count = CYLINDER_EXIT_CONFIRM_LATCH;
     }
@@ -289,8 +288,7 @@ uint8 Cylinder_IsOnSurface(void)
  * EXIT_STRAIGHT继续确认正立出口。返回1表示当前需要筒面负压。
  */
 uint8 Cylinder_ImuUpdate(float ay_g, float az_g,
-                         float gyro_x_dps, float pitch_deg,
-                         float yaw_deg)
+                         float gyro_x_dps, float pitch_deg)
 {
     if (cylinder_state == CYLINDER_STATE_IDLE)
         return 0;
@@ -322,9 +320,9 @@ uint8 Cylinder_ImuUpdate(float ay_g, float az_g,
         return Cylinder_IsOnSurface();
     }
 
-    cylinder_update_motion_evidence(ay_g, az_g, gyro_x_dps, yaw_deg);
-    cylinder_update_exit_pose(gyro_x_dps, pitch_deg, az_g, yaw_deg);
-    cylinder_update_leave_yaw(yaw_deg);
+    cylinder_update_motion_evidence(ay_g, az_g, gyro_x_dps);
+    cylinder_update_exit_pose(gyro_x_dps, pitch_deg, az_g);
+    cylinder_update_leave_distance();
     cylinder_update_speed_percent();
 
     return Cylinder_IsOnSurface();
@@ -430,7 +428,7 @@ void Cylinder_Reset(void)
     cylinder_entry_lockout = 0;
     cylinder_rearm_lockout_count = 0;
     cylinder_rotation_progress_deg = 0.0f;
-    cylinder_yaw_leave_deg = 0.0f;
+    cylinder_exit_start_encoder = 0.0f;
     cylinder_left_guard_active = 0;
     cylinder_speed_percent = 100U;
     cylinder_state = CYLINDER_STATE_IDLE;

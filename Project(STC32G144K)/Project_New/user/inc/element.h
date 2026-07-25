@@ -18,6 +18,7 @@ void Element_ImuUpdate(const imu_sample_t *sample);
 uint8 Element_AdcUpdate(void);
 uint8 Element_IsStraightHold(void);
 void Element_ControlTick(void);
+int16 Element_AdjustNormalSpeed(int16 base_speed);
 void Element_PrepareControl(int16 straight_speed,
                             int16 *target_speed,
                             int16 *direction_diff);

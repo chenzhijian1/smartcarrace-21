@@ -118,9 +118,11 @@ ELEMENT_WALL,
     ((uint8)(sizeof(element_route) / sizeof(element_route[0])))
 
 #define ELEMENT_CYLINDER_FAN_BOOST_TICKS (200U)
+#define ELEMENT_POST_CYLINDER_SPEED_REDUCTION (50)
 
 static volatile uint8 element_route_index = 0;               // 当前赛道路线索引，指向 element_route[] 中的位置
 static volatile uint8 element_current_type = ELEMENT_DONE;   // 当前活跃的立体元素类型
+static volatile uint8 element_post_cylinder_slowdown = 0;    // 圆筒完成后、环岛完成前减速
 static volatile uint8 element_cylinder_fan_boosted = 0;      // 圆柱体风扇是否处于1秒增强窗口
 static volatile uint8 element_cylinder_fan_boost_done = 0;   // 本次圆柱体是否已经完成增强
 static volatile uint8 element_cylinder_fan_boost_ticks = 0;  // 5ms控制周期计数
@@ -280,6 +282,11 @@ static void element_complete(element_type_t completed_type)
 
     motor_set_feedforward_pwm(0);
 
+    if (completed_type == ELEMENT_CYLINDER)
+        element_post_cylinder_slowdown = 1;
+    else if (completed_type == ELEMENT_HUANDAO)
+        element_post_cylinder_slowdown = 0;
+
     if ((uint8)(element_route_index + 1U) >= ELEMENT_ROUTE_COUNT)
     {
         element_route_index = ELEMENT_ROUTE_COUNT;
@@ -302,6 +309,7 @@ void Element_Init(void)
 
     element_route_index = 0;
     element_current_type = (uint8)element_route[0];
+    element_post_cylinder_slowdown = 0;
     element_cylinder_fan_boosted = 0;
     element_cylinder_fan_boost_done = 0;
     element_cylinder_fan_boost_ticks = 0;
@@ -333,8 +341,7 @@ void Element_ImuUpdate(const imu_sample_t *sample)
             cylinder_on_surface = Cylinder_ImuUpdate(sample->ay_g,
                                                      sample->az_g,
                                                      sample->gx_dps,
-                                                     euler.pitch,
-                                                     euler.yaw);
+                                                     euler.pitch);
             element_update_cylinder_fan(cylinder_on_surface);
             if (Cylinder_HasExited())
                 element_complete(ELEMENT_CYLINDER);
@@ -401,6 +408,21 @@ void Element_ControlTick(void)
     {
         element_restore_cylinder_fan();
     }
+}
+
+/* 圆筒完成到环岛完成期间，将基础速度幅值降低50。 */
+int16 Element_AdjustNormalSpeed(int16 base_speed)
+{
+    if (!element_post_cylinder_slowdown)
+        return base_speed;
+
+    if (base_speed > ELEMENT_POST_CYLINDER_SPEED_REDUCTION)
+        return (int16)(base_speed -
+                       ELEMENT_POST_CYLINDER_SPEED_REDUCTION);
+    if (base_speed < -ELEMENT_POST_CYLINDER_SPEED_REDUCTION)
+        return (int16)(base_speed +
+                       ELEMENT_POST_CYLINDER_SPEED_REDUCTION);
+    return 0;
 }
 
 /* 在控制循环前，根据当前元素类型调整目标速度和方向偏差，供各元素模块施加特定控制策略。 */

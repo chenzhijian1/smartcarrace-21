@@ -66,8 +66,8 @@ uint8 flag_suction_fan_off = 0;
 // EEPROM默认�?
 static uint8 flag_suction_fan_off_iap = 0;
 
-#define error_turn 17.0f
-uint16 suction_fan_pwm_start = 4800;
+#define error_turn 15.0f
+uint16 suction_fan_pwm_start = 4500;
 #define LAUNCH_FAN_DELAY_TICKS   400
 
 static int16 car_control_protect_cylinder_diff(int16 direction_diff)
@@ -128,26 +128,29 @@ static int16 car_control_protect_cylinder_diff(int16 direction_diff)
  * 正常循迹模式 (flag=0)
  *---------------------------------------------------------------------------*/
 void CarControl_NormalMode(int16 c_speed, int16 s_speed) {
+    int16 active_normal_speed;
+
     Element_ControlTick();
+    active_normal_speed = Element_AdjustNormalSpeed(normal_speed);
 
     if (Element_IsStraightHold()) {
         changed_speed = 0;
-        normal_speed_cal = normal_speed;
-        normal_speed_pre = normal_speed;
-        test_speed = normal_speed;
-        set_leftspeed = normal_speed;
-        set_rightspeed = normal_speed;
+        normal_speed_cal = active_normal_speed;
+        normal_speed_pre = active_normal_speed;
+        test_speed = active_normal_speed;
+        set_leftspeed = active_normal_speed;
+        set_rightspeed = active_normal_speed;
         return;
     }
 
     dir_pid(aaddcc.err_dir, aaddcc.last_err_dir, gyro_z);
 
     // 速度策略
-    normal_speed_cal = (int16)-s * aaddcc.err_dir * aaddcc.err_dir + normal_speed;
+    normal_speed_cal = (int16)-s * aaddcc.err_dir * aaddcc.err_dir + active_normal_speed;
 
-    normal_speed_pre = normal_speed;
+    normal_speed_pre = active_normal_speed;
     test_speed = (int16)normal_speed_cal;
-    Element_PrepareControl(normal_speed, &test_speed, &changed_speed);
+    Element_PrepareControl(active_normal_speed, &test_speed, &changed_speed);
 
     // if (flag_key_fast == 1) {
     //     speed_adjust(120, 600);
@@ -290,11 +293,11 @@ uint8 car_stop_judge(void) {
 void dir_pid(float error, float last_error, float gyro) {
     int16 p_out, d_out, output;
 
-    if (fabs(error) > 1.2f * error_turn)
-        p_out = (int16)((kpa / 10.0f) * error +
-                        1.2f * kpb * (error / error_turn) *
-                        (error / error_turn) * (error / error_turn));
-    else
+    // if (fabs(error) > 1.2f * error_turn)
+    //     p_out = (int16)((kpa / 10.0f) * error +
+    //                     1.2f * kpb * (error / error_turn) *
+    //                     (error / error_turn) * (error / error_turn));
+    // else
         p_out = (int16)((kpa / 10.0f) * error +
                         kpb * (error / error_turn) *
                         (error / error_turn) * (error / error_turn));
@@ -340,6 +343,5 @@ void CarControl_Init(void) {
  * 保存车辆控制参数到EEPROM
  *---------------------------------------------------------------------------*/
 void CarControl_SaveConfig(void) {
-    flag_suction_fan_off_iap = flag_suction_fan_off;
-    eeprom_write_float_ascii((float)flag_suction_fan_off, 3, 1, 0x176);
+    /* Configuration persistence is owned by Config_Save(). */
 }

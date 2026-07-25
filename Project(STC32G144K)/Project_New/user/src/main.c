@@ -15,8 +15,8 @@ void uart_telemetry_print(void)
             printf("%d,", flag);
             printf("%d,%d,", motor_left.setspeed, motor_left.encoder_data);
             printf("%d,", motor_left.duty1);
-             printf("%d,%d,", motor_right.setspeed, motor_right.encoder_data);
-             printf("%d,", motor_right.duty1);
+            printf("%d,%d,", motor_right.setspeed, motor_right.encoder_data);
+            printf("%d,", motor_right.duty1);
             printf("%d,%.1f,", normal_speed, encoder_ave);
             printf("%.2f,", aaddcc.err_dir);
             printf("%d\r\n", voltage_battery_get_mv());
@@ -31,7 +31,7 @@ void uart_telemetry_print(void)
             break;
 
         case 2:
-            printf("%d,", flag);
+            // printf("%d,", flag);
             printf("%.2f,%.2f,", AD_ONE[0], AD_ONE[1]);
             printf("%.2f,%.2f,", AD_ONE[3], AD_ONE[4]);
             printf("%.2f,", aaddcc.err_dir);
@@ -131,6 +131,9 @@ void main(void)
 
     // suction_fan_on(9999);
 
+    Config_Init();
+    Config_ButtonInit();
+
     Quaternion_Init();
     while (imu660rc_init(IMU660RC_QUARTERNION_DISABLE))
     {
@@ -141,9 +144,6 @@ void main(void)
     Gyro_Calibration(400);
     Element_Init();
 
-    // Config_Init();
-    // Huandao_Init();
-    // CarControl_Init();
   /*
     
 while(1)
@@ -162,6 +162,7 @@ while(1)
     while (1)
     {
         uart_command_poll();
+        Config_ButtonPoll();
 
         if (flag_gyro_z)
         {
@@ -191,7 +192,7 @@ while(1)
         // UI_KeyScan();
         // UI_Display();
 
-        if (send_flag)
+        if (send_flag && !debug_mode)
         {
             send_flag = 0;
             uart_telemetry_print();
