@@ -62,9 +62,9 @@ typedef struct {
     int16 err2;
     int16 encoder_data;
     int16 duty1;
-    int16 out_p;
-    int16 out_i;
-    int16 out_d;
+    float out_p;
+    float out_i;
+    float out_d;
     float Kp_motor;
     float Ki_motor;
     float Kd_motor;

@@ -18,17 +18,17 @@ uint8 debug_mode = 0;
 /*---------------------------------------------------------------------------
  * 方向控制PID参数
  *---------------------------------------------------------------------------*/
-float kpa = 32.6f;
-float kpb = 56.4f;
-float kd = 42.0f;
-float kd_imu = 0.0f;
+float kpa = 50.0f;
+float kpb = 80.0f;
+float kd = 70.0f;
+float kd_imu = 10.0f;
 
 /*---------------------------------------------------------------------------
  * 电机速度环PID参数
  *---------------------------------------------------------------------------*/
 
-float kp_motor = 10.78f;
-float ki_motor = 2.50f;
+float kp_motor = 10.0f;
+float ki_motor = 2.0f;
 float kd_motor = 0.0f;
 
 /*
@@ -49,12 +49,12 @@ int16 normal_speed = 0;
  * EEPROM默认值
  *---------------------------------------------------------------------------*/
 // PID默认值
-float kpa_iap = 20;
-float kpb_iap = 50;
-float kd_iap = 50;
-float kd_imu_iap = 0;
-float kp_motor_iap = 22;
-float ki_motor_iap = 4;
+float kpa_iap = 50;
+float kpb_iap = 80;
+float kd_iap = 70;
+float kd_imu_iap = 10;
+float kp_motor_iap = 10;
+float ki_motor_iap = 2;
 float kd_motor_iap = 0;
 
 // 速度默认值

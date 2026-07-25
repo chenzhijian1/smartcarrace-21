@@ -67,7 +67,7 @@ uint8 flag_suction_fan_off = 0;
 static uint8 flag_suction_fan_off_iap = 0;
 
 #define error_turn 17.0f
-uint16 suction_fan_pwm_start = 00;
+uint16 suction_fan_pwm_start = 4800;
 #define LAUNCH_FAN_DELAY_TICKS   400
 
 static int16 car_control_protect_cylinder_diff(int16 direction_diff)
@@ -233,7 +233,7 @@ void CarControl_Update(void) {
 
         switch (flag) {
             case 0:  // 正常模式
-                CarControl_NormalMode(250, 1000);
+                CarControl_NormalMode(250, 1200);
                 break;
             
             case 1:
@@ -287,9 +287,18 @@ uint8 car_stop_judge(void) {
  *---------------------------------------------------------------------------*/
 void dir_pid(float error, float last_error, float gyro) {
     int16 p_out, d_out, output;
-    
-    p_out = (int16)((kpa / 10) * error + kpb * (error / error_turn) * (error / error_turn) * (error / error_turn));
-    d_out = (int16)(kd * (error - last_error)) + (int16)(kd_imu / 100.0 * gyro);
+
+    if (fabs(error) > 1.2f * error_turn)
+        p_out = (int16)((kpa / 10.0f) * error +
+                        1.2f * kpb * (error / error_turn) *
+                        (error / error_turn) * (error / error_turn));
+    else
+        p_out = (int16)((kpa / 10.0f) * error +
+                        kpb * (error / error_turn) *
+                        (error / error_turn) * (error / error_turn));
+
+    d_out = (int16)(kd * (error - last_error)) -
+            (int16)(kd_imu / 100.0f * gyro);
     output = p_out + d_out;
 
     changed_speed = output;
@@ -302,8 +311,8 @@ void dir_pid(float error, float last_error, float gyro) {
 void speed_adjust(int16 c_speed, int16 s_speed) {
     changed_speed = MINMAX(changed_speed, -c_speed, c_speed);
 
-    k = fabs(aaddcc.err_dir / 40.0f);
-    // k = 0;
+    k = fabs(aaddcc.err_dir / 30.0f);
+
     if (changed_speed > 0) {
         set_leftspeed = test_speed - changed_speed * (1 + k);
         set_rightspeed = test_speed + changed_speed;

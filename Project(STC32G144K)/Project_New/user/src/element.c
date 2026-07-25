@@ -10,7 +10,7 @@
 /* 赛道顺序只在这里配置，允许重复同一种元素。 */
 static const element_type_t element_route[] =
 {
-
+ELEMENT_HUANDAO,
     ELEMENT_CYLINDER,
 ELEMENT_HUANDAO,
 ELEMENT_CYLINDER,
