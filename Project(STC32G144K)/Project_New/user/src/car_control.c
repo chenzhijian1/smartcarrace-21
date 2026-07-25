@@ -128,6 +128,8 @@ static int16 car_control_protect_cylinder_diff(int16 direction_diff)
  * 正常循迹模式 (flag=0)
  *---------------------------------------------------------------------------*/
 void CarControl_NormalMode(int16 c_speed, int16 s_speed) {
+    Element_ControlTick();
+
     if (Element_IsStraightHold()) {
         changed_speed = 0;
         normal_speed_cal = normal_speed;

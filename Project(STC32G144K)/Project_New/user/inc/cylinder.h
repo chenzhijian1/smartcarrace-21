@@ -21,7 +21,7 @@
 #define CYLINDER_PRE_ENTRY_OUTWARD_DIFF_MAX  (160) /* 允许向右修正的最大差速 */
 #define CYLINDER_ENTRY_LEFT_GUARD_DEG         (0.0f) /* 入口左转保护解除角度，进度到达后允许左转 */
 
-#define CYLINDER_GRAVITY_FF_PWM                (1600.0f) /* 圆筒重力前馈PWM基值 */
+#define CYLINDER_GRAVITY_FF_PWM                (1700.0f) /* 圆筒重力前馈PWM基值 */
 #define CYLINDER_TOP_SPEED_PERCENT             (100U)    /* 圆筒顶部目标为普通设定速度的120% */
 #define CYLINDER_SATURATION_PWM_THRESHOLD      (9500)    /* 电机饱和检测：PWM占空比阈值 */
 #define CYLINDER_SATURATION_ERROR_THRESHOLD    (80)      /* 电机饱和检测：误差阈值 */
