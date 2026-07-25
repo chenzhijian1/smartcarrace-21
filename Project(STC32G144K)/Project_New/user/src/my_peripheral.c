@@ -32,15 +32,36 @@ static void uart_feedback_hold_start(void)
     send_flag = 0;
 }
 
-static void uart_command_print_params(void)
+static void uart_command_print_result(char command)
 {
-    printf("%.2f,%.2f,", kpa, kpb);
-    printf("%.2f,%.2f,", kd, kd_imu);
-    printf("%.2f,%.2f,", kp_motor, ki_motor);
-    printf("%d,", normal_speed);
-    printf("%.2f,", s);
-    printf("%.2f,%.2f,", A_, B_);
-    printf("%.2f\r\n", C_);
+    if (debug_mode)
+    {
+        switch (command)
+        {
+            case 'a': printf("kpa=%.2f\r\n", kpa); break;
+            case 'b': printf("kpb=%.2f\r\n", kpb); break;
+            case 'd': printf("kd=%.2f\r\n", kd); break;
+            case 'D': printf("kd_imu=%.2f\r\n", kd_imu); break;
+            case 'p': printf("kp_motor=%.2f\r\n", kp_motor); break;
+            case 'i': printf("ki_motor=%.2f\r\n", ki_motor); break;
+            case 'n': printf("normal_speed=%d\r\n", normal_speed); break;
+            case 's': printf("s=%.2f\r\n", s); break;
+            case 'A': printf("A=%.3f\r\n", A_); break;
+            case 'B': printf("B=%.3f\r\n", B_); break;
+            case 'C': printf("C=%.3f\r\n", C_); break;
+            default: break;
+        }
+    }
+    else
+    {
+        printf("%.2f,%.2f,", kpa, kpb);
+        printf("%.2f,%.2f,", kd, kd_imu);
+        printf("%.2f,%.2f,", kp_motor, ki_motor);
+        printf("%d,", normal_speed);
+        printf("%.2f,", s);
+        printf("%.2f,%.2f,", A_, B_);
+        printf("%.2f\r\n", C_);
+    }
     uart_feedback_hold_start();
 }
 
@@ -102,7 +123,7 @@ static uint8 uart_command_apply(char *cmd)
     if (cmd[0] == 't' && cmd[1] >= '0' && cmd[1] <= '9' && cmd[2] == '\0')
     {
         uart_output_mode = (uint8)(cmd[1] - '0');
-        printf("mode,%d\r\n", uart_output_mode);
+        if (!debug_mode) printf("mode,%d\r\n", uart_output_mode);
         uart_feedback_hold_start();
         return 1;
     }
@@ -111,7 +132,27 @@ static uint8 uart_command_apply(char *cmd)
     if (cmd[0] == 'f' && cmd[1] >= '0' && cmd[1] <= '9' && cmd[2] == '\0')
     {
         flag = (uint8)(cmd[1] - '0');
-        printf("flag,%d\r\n", flag);
+        if (!debug_mode) printf("flag,%d\r\n", flag);
+        uart_feedback_hold_start();
+        return 1;
+    }
+
+    if (cmd[0] == 'h' &&
+        cmd[1] >= '0' && cmd[1] < ('0' + HUANDAO_MAX_COUNT) &&
+        cmd[2] != '\0')
+    {
+        uint8 index = (uint8)(cmd[1] - '0');
+
+        value = uart_cmd_to_float((const char *)(cmd + 2));
+        if (value < 0.0f)
+            return 0;
+
+        distance_before_huandao[index] = value;
+        if (debug_mode)
+            printf("distance_before_huandao[%u]=%.1f\r\n",
+                   index, distance_before_huandao[index]);
+        else
+            printf("huandao_distance,%u,%.1f\r\n", index, value);
         uart_feedback_hold_start();
         return 1;
     }
@@ -146,18 +187,20 @@ static uint8 uart_command_apply(char *cmd)
             if ((int16)value == 0)
                 CarControl_RequestSoftStop();
             else
-                normal_speed = (int16)value;
+                Config_SetNormalSpeed((int16)value);
             break;
 
         case 'u':                           // u+��ֵ: �޸ĸ�ѹ��������Ŀ�� PWM��ռ�ձȷ�Χ 0~10000
             suction_fan_pwm_start = (uint16)motor_pwm_limit((int)value);
-            printf("fan_start,%d\r\n", suction_fan_pwm_start);
+            if (debug_mode) printf("suction_fan_pwm_start=%u\r\n", suction_fan_pwm_start);
+            else printf("fan_start,%d\r\n", suction_fan_pwm_start);
             uart_feedback_hold_start();
             return 1;
 
         case 'v':
             suction_fan_pwm_cylinder = (uint16)motor_pwm_limit((int)value);
-            printf("fan_cylinder,%d\r\n", suction_fan_pwm_cylinder);
+            if (debug_mode) printf("suction_fan_pwm_cylinder=%u\r\n", suction_fan_pwm_cylinder);
+            else printf("fan_cylinder,%d\r\n", suction_fan_pwm_cylinder);
             uart_feedback_hold_start();
             return 1;
 
@@ -170,7 +213,7 @@ static uint8 uart_command_apply(char *cmd)
 
     if (applied)
     {
-        uart_command_print_params();
+        uart_command_print_result(cmd[0]);
     }
 
     return applied;
@@ -254,5 +297,3 @@ void beep_test(void) {
 void block_judgement(void) {
     
 }
-
-

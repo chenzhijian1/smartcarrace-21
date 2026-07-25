@@ -21,7 +21,7 @@
 #define CYLINDER_PRE_ENTRY_OUTWARD_DIFF_MAX  (160) /* 允许向右修正的最大差速 */
 #define CYLINDER_ENTRY_LEFT_GUARD_DEG         (0.0f) /* 入口左转保护解除角度，进度到达后允许左转 */
 
-#define CYLINDER_GRAVITY_FF_PWM                (1600.0f) /* 圆筒重力前馈PWM基值 */
+#define CYLINDER_GRAVITY_FF_PWM                (1680.0f) /* 圆筒重力前馈PWM基值 */
 #define CYLINDER_TOP_SPEED_PERCENT             (100U)    /* 圆筒顶部目标为普通设定速度的120% */
 #define CYLINDER_SATURATION_PWM_THRESHOLD      (9500)    /* 电机饱和检测：PWM占空比阈值 */
 #define CYLINDER_SATURATION_ERROR_THRESHOLD    (80)      /* 电机饱和检测：误差阈值 */
@@ -51,7 +51,7 @@
 #define CYLINDER_EXIT_PITCH_MAX_DEG          (60.0f)  /* 俯仰角上限，车头需接近水平 */
 #define CYLINDER_EXIT_AZ_MIN_G               (0.60f)   /* Z轴加速度下限，车身需接近正立 */
 #define CYLINDER_EXIT_IMU_CONFIRM_SAMPLES    (4U)      /* 出口姿态连续确认帧数，4帧约6cm */
-#define CYLINDER_LEAVE_YAW_DELTA_DEG          (70.0f)  /* 进入状态3后，航向正向变化超过该角度才完成 */
+#define CYLINDER_LEAVE_ENCODER_DELTA           (400.0f) /* 进入状态3后，编码器前进差值达到该值才完成 */
 #define CYLINDER_EXIT_CONFIRM_LATCH          (30U)     /* 出口确认锁存值，用于HasExited()判断 */
 
 /*
@@ -76,8 +76,7 @@ void Cylinder_Init(void);
 /* 消费direction_adc_get()刚刚更新的ad_ave[]，不引入额外电感帧结构。 */
 uint8 Cylinder_AdcUpdate(void);
 uint8 Cylinder_ImuUpdate(float ay_g, float az_g,
-                         float gyro_x_dps, float pitch_deg,
-                         float yaw_deg);
+                         float gyro_x_dps, float pitch_deg);
 
 /* ---------- 状态查询与入口转向保护 ---------- */
 uint8 Cylinder_EntryIsDetected(void);  /* 本轮曾识别入口 */

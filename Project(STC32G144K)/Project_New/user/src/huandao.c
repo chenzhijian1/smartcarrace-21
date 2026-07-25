@@ -6,10 +6,10 @@
 #include "quaternion.h"
 #include "navigation.h"
 
-#define HUANDAO_ENTER_ANGLE 60.0f
-#define HUANDAO_INSIDE_ANGLE 280.0f
-#define HUANDAO_EXIT_DISTANCE 250.0f
-#define HUANDAO_ENTRY_BIAS_RATIO 0.60f
+#define HUANDAO_ENTER_ANGLE 40.0f
+#define HUANDAO_INSIDE_ANGLE 260.0f
+#define HUANDAO_EXIT_DISTANCE 180.0f
+#define HUANDAO_ENTRY_BIAS_RATIO 0.50f
 #define HUANDAO_DETECT_CONFIRM_COUNT (3U)
 
 /*============================================================================
@@ -26,7 +26,7 @@ uint8 huandao_dir[HUANDAO_MAX_COUNT] = {1, 0, 0, 0, 0};
 // 环岛方向数组：0 为左环（逆时针、航向角增加），1 为右环（顺时针、航向角减少）。
 uint8 huandao_dir_source[HUANDAO_MAX_COUNT] = {0, 0, 0, 0, 0};
 uint8 huandao_r[HUANDAO_MAX_COUNT] = {20, 35, 30, 30, 30};   // 环岛半径数组（单位：cm）
-float distance_before_huandao[HUANDAO_MAX_COUNT] = {230, 230, 230, 230, 230};  // 环岛前距离数组（单位：编码器）
+float distance_before_huandao[HUANDAO_MAX_COUNT] = {170, 230, 230, 230, 230};  // 环岛前距离数组（单位：编码器）
 
 // EEPROM默认值
 static float distance_before_huandao_iap[HUANDAO_MAX_COUNT] = {200, 200, 200, 200, 200};
@@ -309,33 +309,5 @@ void Huandao_Init(void) {
  * 保存环岛参数到EEPROM
  *---------------------------------------------------------------------------*/
 void Huandao_SaveConfig(void) {
-    // 更新默认值数组
-    int i;
-    for (i = 0; i < HUANDAO_MAX_COUNT; i++) {
-        distance_before_huandao_iap[i] = distance_before_huandao[i];
-        huandao_dir_iap[i] = huandao_dir[i];
-        huandao_r_iap[i] = huandao_r[i];
-    }
-    huandao_num_iap = huandao_num;
-    
-    // 写入EEPROM
-    eeprom_write_float_ascii(distance_before_huandao[0], 3, 1, 0x100);
-    eeprom_write_float_ascii(distance_before_huandao[1], 3, 1, 0x107);
-    eeprom_write_float_ascii(distance_before_huandao[2], 3, 1, 0x10e);
-    eeprom_write_float_ascii(distance_before_huandao[3], 3, 1, 0x115);
-    eeprom_write_float_ascii(distance_before_huandao[4], 3, 1, 0x11c);
-    eeprom_write_float_ascii((float)huandao_num, 3, 1, 0x13f);
-    
-    eeprom_write_float_ascii((float)huandao_dir[0], 3, 1, 0x146);
-    eeprom_write_float_ascii((float)huandao_dir[1], 3, 1, 0x14a);
-    eeprom_write_float_ascii((float)huandao_dir[2], 3, 1, 0x14e);
-    eeprom_write_float_ascii((float)huandao_dir[3], 3, 1, 0x152);
-    eeprom_write_float_ascii((float)huandao_dir[4], 3, 1, 0x156);
-    
-    eeprom_write_float_ascii((float)huandao_r[0], 3, 1, 0x15e);
-    eeprom_write_float_ascii((float)huandao_r[1], 3, 1, 0x162);
-    eeprom_write_float_ascii((float)huandao_r[2], 3, 1, 0x166);
-    eeprom_write_float_ascii((float)huandao_r[3], 3, 1, 0x16a);
-    eeprom_write_float_ascii((float)huandao_r[4], 3, 1, 0x16e);
-    
+    /* Configuration persistence is owned by Config_Save(). */
 }

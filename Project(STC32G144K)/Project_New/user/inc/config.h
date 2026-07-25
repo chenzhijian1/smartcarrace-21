@@ -78,6 +78,10 @@ extern float normal_speed_iap;
  * 函数声明
  *---------------------------------------------------------------------------*/
 void Config_Init(void);         // 初始化全局配置（从EEPROM读取）
+uint8 Config_Save(void);
 void Config_SaveAll(void);      // 保存全局配置到EEPROM
+void Config_SetNormalSpeed(int16 speed);
+void Config_ButtonInit(void);
+void Config_ButtonPoll(void);
 
 #endif /* __CONFIG_H */

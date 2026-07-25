@@ -117,10 +117,16 @@ ELEMENT_WALL,
 #define ELEMENT_ROUTE_COUNT \
     ((uint8)(sizeof(element_route) / sizeof(element_route[0])))
 
+#define ELEMENT_CYLINDER_FAN_BOOST_TICKS (200U)
+#define ELEMENT_POST_CYLINDER_SPEED_REDUCTION (50)
+
 static volatile uint8 element_route_index = 0;               // 当前赛道路线索引，指向 element_route[] 中的位置
 static volatile uint8 element_current_type = ELEMENT_DONE;   // 当前活跃的立体元素类型
-static uint8 element_cylinder_fan_boosted = 0;               // 圆柱体风扇是否已提升功率的标志
-static uint16 element_cylinder_fan_applied_pwm = 0;          // 圆柱体风扇当前实际应用的PWM值
+static volatile uint8 element_post_cylinder_slowdown = 0;    // 圆筒完成后、环岛完成前减速
+static volatile uint8 element_cylinder_fan_boosted = 0;      // 圆柱体风扇是否处于1秒增强窗口
+static volatile uint8 element_cylinder_fan_boost_done = 0;   // 本次圆柱体是否已经完成增强
+static volatile uint8 element_cylinder_fan_boost_ticks = 0;  // 5ms控制周期计数
+static volatile uint16 element_cylinder_fan_applied_pwm = 0; // 圆柱体风扇当前实际应用的PWM值
 
 uint16 suction_fan_pwm_cylinder = 7800;                     // 圆柱体吸风风扇目标PWM（默认满功率10000）
 
@@ -172,33 +178,41 @@ static void element_update_gravity_feedforward(void)
     motor_set_feedforward_pwm(feedforward_pwm);
 }
 
-/* 根据圆柱体上表面检测状态切换吸风风扇：进入上表面时提升风扇功率增强吸附力，离开时恢复初始功率。 */
+static void element_restore_cylinder_fan(void)
+{
+    element_cylinder_fan_boosted = 0;
+    element_cylinder_fan_boost_done = 1;
+    element_cylinder_fan_boost_ticks = 0;
+
+    /* 安全逻辑已关闭或接管风机时，不重新启动。 */
+    if (pwm_fan != element_cylinder_fan_applied_pwm ||
+        flag_suction_fan_off || voltage_battery_is_low() ||
+        (normal_speed == 0 && flag != 5))
+    {
+        element_cylinder_fan_applied_pwm = 0;
+        return;
+    }
+
+    suction_fan_on(suction_fan_pwm_start);
+    element_cylinder_fan_applied_pwm = 0;
+}
+
+/* 确认上筒时启动一次1秒增强窗口，退出角度不再决定负压恢复。 */
 static void element_update_cylinder_fan(uint8 on_surface)
 {
-    if (on_surface && !element_cylinder_fan_boosted)
+    if (on_surface && !element_cylinder_fan_boosted &&
+        !element_cylinder_fan_boost_done)
     {
         if (pwm_fan == 0 || flag_suction_fan_off)
             return;
 
-        element_cylinder_fan_boosted = 1;
         element_cylinder_fan_applied_pwm = suction_fan_pwm_cylinder;
+        element_cylinder_fan_boost_ticks = 0;
+        element_cylinder_fan_boosted = 1;
         if (suction_fan_pwm_cylinder == 0)
             suction_fan_off();
         else
             suction_fan_on(suction_fan_pwm_cylinder);
-    }
-    else if (!on_surface && element_cylinder_fan_boosted)
-    {
-        element_cylinder_fan_boosted = 0;
-
-        /* 安全逻辑已关闭风机时，不在主循环中重新启动。 */
-        if (pwm_fan != element_cylinder_fan_applied_pwm ||
-            flag_suction_fan_off || voltage_battery_is_low() ||
-            (normal_speed == 0 && flag != 5))
-            return;
-
-        suction_fan_on(suction_fan_pwm_start);
-        element_cylinder_fan_applied_pwm = 0;
     }
 }
 
@@ -243,6 +257,10 @@ static void element_reset_type(element_type_t type)
             break;
         case ELEMENT_CYLINDER:
             Cylinder_Reset();
+            element_cylinder_fan_boosted = 0;
+            element_cylinder_fan_boost_done = 0;
+            element_cylinder_fan_boost_ticks = 0;
+            element_cylinder_fan_applied_pwm = 0;
             break;
         case ELEMENT_HUANDAO:
             Huandao_DetectReset();
@@ -263,6 +281,11 @@ static void element_complete(element_type_t completed_type)
         return;
 
     motor_set_feedforward_pwm(0);
+
+    if (completed_type == ELEMENT_CYLINDER)
+        element_post_cylinder_slowdown = 1;
+    else if (completed_type == ELEMENT_HUANDAO)
+        element_post_cylinder_slowdown = 0;
 
     if ((uint8)(element_route_index + 1U) >= ELEMENT_ROUTE_COUNT)
     {
@@ -286,7 +309,10 @@ void Element_Init(void)
 
     element_route_index = 0;
     element_current_type = (uint8)element_route[0];
+    element_post_cylinder_slowdown = 0;
     element_cylinder_fan_boosted = 0;
+    element_cylinder_fan_boost_done = 0;
+    element_cylinder_fan_boost_ticks = 0;
     element_cylinder_fan_applied_pwm = 0;
     element_wall_fan_boosted = 0;
     element_wall_fan_applied_pwm = 0;
@@ -315,8 +341,7 @@ void Element_ImuUpdate(const imu_sample_t *sample)
             cylinder_on_surface = Cylinder_ImuUpdate(sample->ay_g,
                                                      sample->az_g,
                                                      sample->gx_dps,
-                                                     euler.pitch,
-                                                     euler.yaw);
+                                                     euler.pitch);
             element_update_cylinder_fan(cylinder_on_surface);
             if (Cylinder_HasExited())
                 element_complete(ELEMENT_CYLINDER);
@@ -364,6 +389,40 @@ uint8 Element_IsStraightHold(void)
     return (uint8)(
         (element_type_t)element_current_type == ELEMENT_HUANDAO &&
         Huandao_DetectIsStraightHold());
+}
+
+/* 正常控制状态下每5ms调用一次，圆柱体增强满1秒后恢复普通负压。 */
+void Element_ControlTick(void)
+{
+    if (!element_cylinder_fan_boosted)
+        return;
+
+    if (element_cylinder_fan_boost_ticks <
+        ELEMENT_CYLINDER_FAN_BOOST_TICKS)
+    {
+        element_cylinder_fan_boost_ticks++;
+    }
+
+    if (element_cylinder_fan_boost_ticks >=
+        ELEMENT_CYLINDER_FAN_BOOST_TICKS)
+    {
+        element_restore_cylinder_fan();
+    }
+}
+
+/* 圆筒完成到环岛完成期间，将基础速度幅值降低50。 */
+int16 Element_AdjustNormalSpeed(int16 base_speed)
+{
+    if (!element_post_cylinder_slowdown)
+        return base_speed;
+
+    if (base_speed > ELEMENT_POST_CYLINDER_SPEED_REDUCTION)
+        return (int16)(base_speed -
+                       ELEMENT_POST_CYLINDER_SPEED_REDUCTION);
+    if (base_speed < -ELEMENT_POST_CYLINDER_SPEED_REDUCTION)
+        return (int16)(base_speed +
+                       ELEMENT_POST_CYLINDER_SPEED_REDUCTION);
+    return 0;
 }
 
 /* 在控制循环前，根据当前元素类型调整目标速度和方向偏差，供各元素模块施加特定控制策略。 */
