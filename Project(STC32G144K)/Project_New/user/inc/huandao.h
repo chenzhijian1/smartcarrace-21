@@ -28,7 +28,6 @@
 typedef enum
 {
     HUANDAO_DETECT_NORMAL = 0,
-    HUANDAO_DETECT_SUSPECT,
     HUANDAO_DETECT_ACTIVE,
     HUANDAO_DETECT_REARM
 } huandao_detect_state_t;
@@ -50,9 +49,7 @@ extern float distance_before_huandao[HUANDAO_MAX_COUNT];
 extern uint8 flag_huandao;      // 0:左环岛, 1:右环岛
 extern volatile uint8 huandao_detect_state;
 
-extern float huandao_pre_h_threshold;
 extern float huandao_confirm_h_threshold;
-extern float huandao_suspect_max_distance;
 extern float huandao_rearm_h_threshold;
 
 /*---------------------------------------------------------------------------

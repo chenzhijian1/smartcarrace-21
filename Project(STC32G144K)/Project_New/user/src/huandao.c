@@ -43,21 +43,16 @@ static float huandao_enter_start_yaw = 0.0f;
 static float huandao_inside_start_yaw = 0.0f;
 
 volatile uint8 huandao_detect_state = HUANDAO_DETECT_NORMAL;
-float huandao_pre_h_threshold = 33.0f;
-float huandao_confirm_h_threshold = 55.0f;
-float huandao_suspect_max_distance = 350.0f;
+float huandao_confirm_h_threshold = 60.0f;
 float huandao_rearm_h_threshold = 30.0f;
 
-static uint8 huandao_pre_count = 0;
 static uint8 huandao_left_count = 0;
 static uint8 huandao_right_count = 0;
 static uint8 huandao_rearm_count = 0;
-static float huandao_detect_entry_encoder = 0.0f;
 static uint8 huandao_exit_event = 0;
 
 static void huandao_detect_reset_counters(void)
 {
-    huandao_pre_count = 0;
     huandao_left_count = 0;
     huandao_right_count = 0;
     huandao_rearm_count = 0;
@@ -66,7 +61,6 @@ static void huandao_detect_reset_counters(void)
 void Huandao_DetectReset(void)
 {
     huandao_detect_state = HUANDAO_DETECT_NORMAL;
-    huandao_detect_entry_encoder = 0.0f;
     huandao_exit_event = 0;
     huandao_detect_reset_counters();
 }
@@ -79,7 +73,7 @@ void Huandao_DetectStartRearm(void)
 
 uint8 Huandao_DetectIsStraightHold(void)
 {
-    return (uint8)(huandao_detect_state == HUANDAO_DETECT_SUSPECT);
+    return 0;
 }
 
 static void huandao_set_detected_direction(uint8 detected_dir)
@@ -92,7 +86,6 @@ static void huandao_set_detected_direction(uint8 detected_dir)
 
 uint8 Huandao_DetectUpdate(void)
 {
-    float element_distance;
     uint8 circle_left;
     uint8 circle_right;
 
@@ -114,29 +107,16 @@ uint8 Huandao_DetectUpdate(void)
         return 0;
     }
 
-    if (huandao_detect_state == HUANDAO_DETECT_NORMAL)
+    if (huandao_detect_state != HUANDAO_DETECT_NORMAL)
+        return 0;
+
+    if (flag != 0)
     {
-        if (flag == 0 && AD_ONE[0] > huandao_pre_h_threshold &&
-            AD_ONE[4] > huandao_pre_h_threshold)
-        {
-            if (++huandao_pre_count >= HUANDAO_DETECT_CONFIRM_COUNT)
-            {
-                huandao_detect_state = HUANDAO_DETECT_SUSPECT;
-                huandao_detect_entry_encoder = encoder_ave;
-                huandao_detect_reset_counters();
-                aaddcc.err_dir = 0.0f;
-                aaddcc.last_err_dir = 0.0f;
-                return 1;
-            }
-        }
-        else
-        {
-            huandao_pre_count = 0;
-        }
+        huandao_left_count = 0;
+        huandao_right_count = 0;
         return 0;
     }
 
-    element_distance = encoder_ave - huandao_detect_entry_encoder;
     circle_left = (uint8)(AD_ONE[0] > huandao_confirm_h_threshold);
     circle_right = (uint8)(AD_ONE[4] > huandao_confirm_h_threshold);
 
@@ -154,10 +134,7 @@ uint8 Huandao_DetectUpdate(void)
         return 1;
     }
 
-    if (element_distance >= huandao_suspect_max_distance)
-        Huandao_DetectStartRearm();
-
-    return (uint8)(huandao_detect_state == HUANDAO_DETECT_SUSPECT);
+    return 0;
 }
 
 uint8 Huandao_ConsumeExitEvent(void)

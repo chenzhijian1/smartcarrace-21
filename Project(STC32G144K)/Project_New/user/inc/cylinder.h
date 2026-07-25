@@ -29,7 +29,7 @@
 #define CYLINDER_SATURATION_DIFF_PERCENT       (90L)     /* 电机饱和后保留的差速百分比（90%） */
 
 /* 开始登筒：车辆pitch连续小于-5度。 */
-#define CYLINDER_ENTRY_PITCH_MAX_DEG          (-5.0f)
+#define CYLINDER_ENTRY_PITCH_MAX_DEG          (-30.0f)
 #define CYLINDER_CLIMB_CONFIRM_SAMPLES       (3U)     /* 5帧约7.5cm */
 
 /* 不依赖陀螺积分的后备位置特征：顶部az为负，后半圈ay为正。 */
