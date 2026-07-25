@@ -36,13 +36,14 @@ void uart_telemetry_print(void)
             printf("%.2f,%.2f,", AD_ONE[3], AD_ONE[4]);
             printf("%.2f,", aaddcc.err_dir);
             printf("%.1f,", encoder_ave);
-            printf("%.2f\r\n",euler.yaw);
+            printf("%.2f\r\n",euler.pitch);
             break;
 
         case 3:
             // printf("%d,%d,%d,", imu660rc_gyro_x, imu660rc_gyro_y, imu660rc_gyro_z);
             // printf("%d,%d,%d,", imu660rc_acc_x, imu660rc_acc_y, imu660rc_acc_z);
             // printf("%.4f,%.4f,", q.q1, q.q2);
+
             printf("%.2f,%.2f,%.2f\r\n", euler.roll, euler.pitch, euler.yaw);
             // printf("%d,%.2f,", imu660rc_gyro_z, gyro_offset_z);
             // printf("%.3f,%.2f\r\n",
@@ -179,6 +180,8 @@ while(1)
                 ticks = 1;
             }
             IMU_Update_Dt(0.005f * ticks);
+            if (flag == 4)
+                euler.pitch = 0.0f;
             IMU_SampleCopy(&imu_sample);
             Element_ImuUpdate(&imu_sample);
         }

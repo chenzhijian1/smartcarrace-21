@@ -18,21 +18,21 @@
 
 /* ---------- 姿态识别阈值 ---------- */
 
-#define SEESAW_TILT_ENTER_DEG             (12.0f)  // 入口需 pitch<=-7°；进入候选后 pitch>0° 即完成。
-#define SEESAW_TILT_MIN_PEAK_DEG          (15.0f) // 回平误触判断使用的最小负pitch峰值。
-#define SEESAW_TILT_MAX_DEG               (90.0f) // |pitch| 超过90°时撤销跷跷板候选。
-
+#define SEESAW_ENTRY_PITCH_MAX_DEG        (-7.0f)  // 入口需 pitch<=-7°。
+#define SEESAW_PEAK_PITCH_MAX_DEG         (-9.0f)  // 回平前必须至少达到 pitch<=-9°。
+#define SEESAW_PITCH_MIN_DEG              (-90.0f) // pitch低于-90°时撤销候选。
+#define SEESAW_PITCH_MAX_DEG              (90.0f)  // pitch高于+90°时撤销候选。
 
 /* ---------- 连续帧和超时 ---------- */
-#define SEESAW_BASELINE_CONFIRM_SAMPLES   (2U)//平面起始姿态连续确认帧数。没有基线时不接受倾角候选。
+#define SEESAW_BASELINE_CONFIRM_SAMPLES   (3U)//平面起始姿态连续确认帧数。没有基线时不接受倾角候选。
 #define SEESAW_ENTER_CONFIRM_SAMPLES      (2U)//负 pitch 抬起连续确认帧数，决定何时进入 RISING。
-#define SEESAW_MAX_CANDIDATE_SAMPLES      (20U)//候选最长：20帧，超时直接判定元素通过
+#define SEESAW_MAX_CANDIDATE_SAMPLES      (500U)//候选最长：40帧，超时直接判定元素通过
 
 
 /* ---------- 第二种速度策略 ---------- */
 /* RISING 阶段的整车目标上限，占普通直线目标的百分比，不是 PWM。
 调小更慢、更容易等待板子落下，但可能无法越过支点；调大更快。 */
-#define SEESAW_SPEED_SLOW_PERCENT         (20U)
+#define SEESAW_SPEED_SLOW_PERCENT         (0U)
 
 
 

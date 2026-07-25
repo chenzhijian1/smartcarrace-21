@@ -28,7 +28,7 @@ extern volatile uint8 send_flag;
 
 static void uart_feedback_hold_start(void)
 {
-    uart_feedback_hold_ticks = 400;
+    uart_feedback_hold_ticks = 10;
     send_flag = 0;
 }
 

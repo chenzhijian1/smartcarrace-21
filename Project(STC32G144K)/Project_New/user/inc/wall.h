@@ -47,7 +47,7 @@
 #define WALL_LATERAL_SPEED_PERCENT          (100U)//横向阶段目标为普通直线目标的120%。
 #define WALL_DESCENT_SPEED_PERCENT          (130U)//下坡阶段目标为普通直线目标的120%。
 
-#define WALL_GRAVITY_FF_PWM                (1600.0f)
+#define WALL_GRAVITY_FF_PWM                (1710.0f)
 
 /* ---------- 状态机状态 ---------- */
 #define WALL_STATE_IDLE                    (0U)//尚未识别到有效墙面上坡。

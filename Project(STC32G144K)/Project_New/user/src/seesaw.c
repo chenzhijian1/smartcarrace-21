@@ -47,21 +47,7 @@ static uint16 seesaw_baseline_count = 0; // 平面基线连续确认帧计数
 static uint8 seesaw_baseline_seen = 0; // 是否已建立平面基线（1 已建立，0 未建立）
 static uint16 seesaw_enter_count = 0; // 上坡倾角连续确认帧计数（进入 RISING 用）
 static uint16 seesaw_candidate_age = 0; // 候选已存活帧数，用于超时检测
-static float seesaw_peak_tilt_deg = 0.0f; // 本次候选期间记录的最大上仰角，单位度
-
-/* ==========================================================================
- * 静态辅助函数
- * ========================================================================== */
-
-/**
- * @brief  从实车pitch提取抬起角度幅值。
- * @param  pitch_deg  姿态解算俯仰角；抬起为负，下降为正。
- * @return 抬起角度幅值，单位度；下降或平坦时返回0。
- */
-static float seesaw_rising_tilt_deg(float pitch_deg)
-{
-    return pitch_deg < 0.0f ? -pitch_deg : 0.0f;
-}
+static float seesaw_peak_pitch_deg = 0.0f; // 本次候选期间记录的最小pitch，单位度
 
 /**
  * @brief  清除本次候选的所有动态数据，回到 IDLE 状态。
@@ -74,7 +60,7 @@ static void seesaw_clear_candidate(void)
     seesaw_state = SEESAW_STATE_IDLE;
     seesaw_enter_count = 0;
     seesaw_candidate_age = 0;
-    seesaw_peak_tilt_deg = 0.0f;
+    seesaw_peak_pitch_deg = 0.0f;
 }
 
 /* 标记本次跷跷板已通过，保留 EXITED 状态供元素管理器消费。 */
@@ -83,7 +69,7 @@ static void seesaw_complete_candidate(void)
     seesaw_state = SEESAW_STATE_EXITED;
     seesaw_enter_count = 0;
     seesaw_candidate_age = 0;
-    seesaw_peak_tilt_deg = 0.0f;
+    seesaw_peak_pitch_deg = 0.0f;
 }
 
 /**
@@ -136,8 +122,7 @@ void Seesaw_Init(void)
  */
 uint8 Seesaw_ImuUpdate(const imu_sample_t *sample, float pitch_deg)
 {
-    float tilt_deg;      /* 负pitch对应的抬起角度幅值，单位度 */
-    uint8 tilt_valid;    /* 上坡条件是否满足 */
+    uint8 entry_valid;   /* 上坡入口条件是否满足 */
     uint8 norm_valid;
     uint8 flat;
 
@@ -186,26 +171,25 @@ uint8 Seesaw_ImuUpdate(const imu_sample_t *sample, float pitch_deg)
          * 步骤 2：检测上坡候选条件。
          * - 平面基线已建立
          * - 加速度模长有效（norm_valid）
-         * - pitch在[-SEESAW_TILT_MAX_DEG, -SEESAW_TILT_ENTER_DEG]范围内
+         * - pitch在[SEESAW_PITCH_MIN_DEG, SEESAW_ENTRY_PITCH_MAX_DEG]范围内
          */
-        tilt_deg = seesaw_rising_tilt_deg(pitch_deg);
-        tilt_valid = (uint8)(
+        entry_valid = (uint8)(
             seesaw_baseline_seen &&
             norm_valid &&
-            tilt_deg >= SEESAW_TILT_ENTER_DEG &&
-            tilt_deg <= SEESAW_TILT_MAX_DEG);
+            pitch_deg >= SEESAW_PITCH_MIN_DEG &&
+            pitch_deg <= SEESAW_ENTRY_PITCH_MAX_DEG);
 
         /*
          * 步骤 3：连续确认后进入 RISING 状态。
          * 同时初始化峰值倾角等候选数据。
          */
-        if (spatial_confirm_update(tilt_valid,
+        if (spatial_confirm_update(entry_valid,
                                    SEESAW_ENTER_CONFIRM_SAMPLES,
                                    &seesaw_enter_count))
         {
             seesaw_state = SEESAW_STATE_RISING;
             seesaw_candidate_age = 0;
-            seesaw_peak_tilt_deg = tilt_deg;
+            seesaw_peak_pitch_deg = pitch_deg;
             seesaw_enter_count = 0;
         }
 
@@ -245,21 +229,20 @@ uint8 Seesaw_ImuUpdate(const imu_sample_t *sample, float pitch_deg)
         return 1;
 
     /* pitch绝对值过大时撤销候选。 */
-    tilt_deg = seesaw_rising_tilt_deg(pitch_deg);
-    if (pitch_deg > SEESAW_TILT_MAX_DEG ||
-        pitch_deg < -SEESAW_TILT_MAX_DEG)
+    if (pitch_deg > SEESAW_PITCH_MAX_DEG ||
+        pitch_deg < SEESAW_PITCH_MIN_DEG)
     {
         seesaw_clear_candidate();
         return 0;
     }
 
     /* 更新峰值倾角 */
-    if (tilt_deg > seesaw_peak_tilt_deg)
-        seesaw_peak_tilt_deg = tilt_deg;
+    if (pitch_deg < seesaw_peak_pitch_deg)
+        seesaw_peak_pitch_deg = pitch_deg;
 
     /* 短暂倾斜后回平且峰值不足时，仍按入口误触处理。 */
     if (flat &&
-        seesaw_peak_tilt_deg < SEESAW_TILT_MIN_PEAK_DEG)
+        seesaw_peak_pitch_deg > SEESAW_PEAK_PITCH_MAX_DEG)
     {
         seesaw_clear_candidate();
         return 0;

@@ -11,14 +11,22 @@
 static const element_type_t element_route[] =
 {
 //ELEMENT_HUANDAO,
-    ELEMENT_CYLINDER,
-ELEMENT_HUANDAO,
+//ELEMENT_SEESAW,
 ELEMENT_CYLINDER,
 ELEMENT_HUANDAO,
+ELEMENT_WALL,
+//ELEMENT_SEESAW,
 ELEMENT_CYLINDER,
 ELEMENT_HUANDAO,
+ELEMENT_WALL,
+//ELEMENT_SEESAW,
 ELEMENT_CYLINDER,
 ELEMENT_HUANDAO,
+ELEMENT_WALL,
+//ELEMENT_SEESAW,
+ELEMENT_CYLINDER,
+ELEMENT_HUANDAO,
+ELEMENT_WALL,
 
  /*  ELEMENT_SEESAW,
    ELEMENT_SEESAW,
@@ -128,7 +136,7 @@ static volatile uint8 element_cylinder_fan_boost_done = 0;   // 本次圆柱体�
 static volatile uint8 element_cylinder_fan_boost_ticks = 0;  // 5ms控制周期计数
 static volatile uint16 element_cylinder_fan_applied_pwm = 0; // 圆柱体风扇当前实际应用的PWM值
 
-uint16 suction_fan_pwm_cylinder = 7800;                     // 圆柱体吸风风扇目标PWM（默认满功率10000）
+uint16 suction_fan_pwm_cylinder = 6800;                     // 圆柱体吸风风扇目标PWM（默认满功率10000）
 
 /* 判断是否允许重力前馈补偿：电池电压低或调试模式(flag==4)时禁止，停车时也禁止（紧急停止flag==5除外）。 */
 static uint8 element_wall_fan_boosted = 0;
@@ -332,6 +340,8 @@ void Element_ImuUpdate(const imu_sample_t *sample)
     switch ((element_type_t)element_current_type)
     {
         case ELEMENT_SEESAW:
+            if (encoder_ave < 1000.0f)
+                break;
             (void)Seesaw_ImuUpdate(sample, euler.pitch);
             if (Seesaw_HasExited())
                 element_complete(ELEMENT_SEESAW);
